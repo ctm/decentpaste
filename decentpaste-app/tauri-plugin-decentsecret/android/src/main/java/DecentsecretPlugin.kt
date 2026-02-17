@@ -1,4 +1,4 @@
-package com.decentpaste.plugins.decentsecret
+package com.craftpoker.plugins.decentsecret
 
 import android.app.Activity
 import android.os.Build
@@ -28,7 +28,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 private const val TAG = "DecentsecretPlugin"
 private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
-private const val KEY_ALIAS = "com.decentpaste.vault.key"
+private const val KEY_ALIAS = "com.craftpoker.vault.key"
 private const val SHARED_PREFS_NAME = "decentsecret_prefs"
 private const val PREF_ENCRYPTED_SECRET = "encrypted_secret"
 private const val PREF_IV = "encryption_iv"

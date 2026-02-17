@@ -14,7 +14,7 @@ use crate::error::Error;
 use crate::models::*;
 
 /// Service name used for keyring entries.
-const SERVICE_NAME: &str = "com.decentpaste.vault";
+const SERVICE_NAME: &str = "com.craftpoker.vault";
 
 /// Account name (username) for the keyring entry.
 const ACCOUNT_NAME: &str = "vault-key";

@@ -23,7 +23,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 ) -> crate::Result<Decentsecret<R>> {
     #[cfg(target_os = "android")]
     let handle =
-        api.register_android_plugin("com.decentpaste.plugins.decentsecret", "DecentsecretPlugin")?;
+        api.register_android_plugin("com.craftpoker.plugins.decentsecret", "DecentsecretPlugin")?;
     #[cfg(target_os = "ios")]
     let handle = api.register_ios_plugin(init_plugin_decentsecret)?;
     Ok(Decentsecret(handle))

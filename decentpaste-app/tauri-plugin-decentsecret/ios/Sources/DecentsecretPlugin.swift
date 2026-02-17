@@ -12,7 +12,7 @@ class StoreSecretArgs: Decodable {
 
 // MARK: - Constants
 
-private let kServiceName = "com.decentpaste.vault"
+private let kServiceName = "com.craftpoker.vault"
 private let kAccountName = "vault-key"
 
 // MARK: - Plugin Implementation

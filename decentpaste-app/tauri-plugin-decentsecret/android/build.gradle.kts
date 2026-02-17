@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.decentpaste.plugins.decentsecret"
+    namespace = "com.craftpoker.plugins.decentsecret"
     compileSdk = 36
 
     defaultConfig {
