@@ -5,7 +5,7 @@
 //! - **Windows**: Credential Manager
 //! - **Linux**: Secret Service API (GNOME Keyring, KWallet)
 
-use keyring::Entry;
+use keyring_core::Entry;
 use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use tracing::{debug, error, info, warn};
@@ -22,6 +22,15 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     _api: PluginApi<R, C>,
     service_name: String,
 ) -> crate::Result<Decentsecret<R>> {
+    #[cfg(target_os = "windows")]
+    keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
+
+    #[cfg(target_os = "macos")]
+    keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
+
+    #[cfg(target_os = "linux")]
+    keyring_core::set_default_store(linux_keyutils_keyring_store::Store::new()?);
+
     Ok(Decentsecret {
         _app: app.clone(),
         service_name,
@@ -61,7 +70,7 @@ impl<R: Runtime> Decentsecret<R> {
                 debug!("Keyring available (entry exists), method: {:?}", method);
                 Ok(SecretStorageStatus::available(method))
             }
-            Err(keyring::Error::NoEntry) => {
+            Err(keyring_core::Error::NoEntry) => {
                 debug!("Keyring available (no entry yet), method: {:?}", method);
                 Ok(SecretStorageStatus::available(method))
             }
@@ -191,7 +200,7 @@ impl<R: Runtime> Decentsecret<R> {
                 info!("Secret deleted from OS keyring");
                 Ok(())
             }
-            Err(keyring::Error::NoEntry) => {
+            Err(keyring_core::Error::NoEntry) => {
                 debug!("No secret to delete (already gone)");
                 Ok(())
             }
@@ -224,16 +233,16 @@ impl<R: Runtime> Decentsecret<R> {
     }
 
     /// Map keyring errors to our error type.
-    fn map_keyring_error(err: keyring::Error) -> Error {
+    fn map_keyring_error(err: keyring_core::Error) -> Error {
         match err {
-            keyring::Error::NoEntry => Error::SecretNotFound,
-            keyring::Error::Ambiguous(_) => {
+            keyring_core::Error::NoEntry => Error::SecretNotFound,
+            keyring_core::Error::Ambiguous(_) => {
                 Error::Internal("Multiple keyring entries found".into())
             }
-            keyring::Error::NoStorageAccess(e) => {
+            keyring_core::Error::NoStorageAccess(e) => {
                 Error::NotAvailable(format!("Keyring access denied: {:?}", e))
             }
-            keyring::Error::PlatformFailure(e) => {
+            keyring_core::Error::PlatformFailure(e) => {
                 let msg = format!("{:?}", e);
                 if msg.contains("Dbus") || msg.contains("dbus") || msg.contains("D-Bus") {
                     Error::NotAvailable(format!(
@@ -244,7 +253,7 @@ impl<R: Runtime> Decentsecret<R> {
                     Error::Internal(format!("Keyring error: {:?}", e))
                 }
             }
-            keyring::Error::BadEncoding(e) => {
+            keyring_core::Error::BadEncoding(e) => {
                 Error::Internal(format!("Keyring encoding error: {:?}", e))
             }
             _ => Error::Internal(format!("Keyring error: {}", err)),

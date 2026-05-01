@@ -65,3 +65,10 @@ impl From<std::io::Error> for Error {
         Error::Io(err.to_string())
     }
 }
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+impl From<keyring_core::Error> for Error {
+    fn from(err: keyring_core::Error) -> Self {
+        Error::Internal(format!("keyring_core failure: {err}"))
+    }
+}
