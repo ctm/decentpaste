@@ -27,6 +27,12 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     #[cfg(target_os = "windows")]
     keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
 
+    #[cfg(target_os = "macos")]
+    keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
+
+    #[cfg(target_os = "linux")]
+    keyring_core::set_default_store(linux_keyutils_keyring_store::Store::new()?);
+
     Ok(Decentsecret(app.clone()))
 }
 
