@@ -201,10 +201,7 @@ class App {
             this.pairingTimeout = setTimeout(() => {
               const session = store.get('activePairingSession');
               if (session && session.state === 'Initiated') {
-                store.addToast(
-                  'Pairing timed out. Make sure the other device is nearby and the app is open.',
-                  'error',
-                );
+                store.addToast('Pairing timed out. Make sure the other device is nearby and the app is open.', 'error');
                 store.set('showPairingModal', false);
                 store.set('activePairingSession', null);
                 commands.cancelPairing(session.session_id).catch(() => {});
