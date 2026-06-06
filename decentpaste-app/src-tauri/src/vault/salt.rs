@@ -4,7 +4,7 @@
 //! with Argon2id to derive the vault encryption key from the user's PIN.
 //! The salt is stored in `salt.bin` and persists across app restarts.
 
-use rand::RngCore;
+use rand::Rng;
 use std::path::PathBuf;
 
 use crate::error::{DecentPasteError, Result};

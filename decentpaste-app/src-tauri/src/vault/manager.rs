@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 
 use argon2::{Algorithm, Argon2, Params, Version};
-use rand::RngCore;
+use rand::Rng;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_decentsecret::DecentsecretExt;
 use tracing::{debug, info, warn};

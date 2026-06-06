@@ -47,8 +47,8 @@ libp2p = { version = "0.56", features = [
 # Cryptography
 aes-gcm = "0.10"
 argon2 = "0.5"
-rand = "0.9"
-sha2 = "0.10"
+rand = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 zeroize = { version = "1.8", features = ["derive"] }
