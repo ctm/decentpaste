@@ -20,7 +20,13 @@ pub fn setup_tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Erro
         tauri::async_runtime::block_on(async { state.settings.read().await.auto_sync_enabled });
 
     // Create menu items
-    let show_item = MenuItem::with_id(app, "show", "Show DecentPaste", true, Some("CommandOrControl+Shift+D"))?;
+    let show_item = MenuItem::with_id(
+        app,
+        "show",
+        "Show DecentPaste",
+        true,
+        Some("CommandOrControl+Shift+D"),
+    )?;
     let sync_label = if sync_enabled {
         "Auto Sync: On"
     } else {

@@ -17,9 +17,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use clipboard::{ClipboardChange, ClipboardEntry, ClipboardMonitor};
 use network::{ClipboardMessage, NetworkCommand, NetworkEvent, NetworkManager};
+use state::AppState;
 #[cfg(any(target_os = "android", target_os = "ios"))]
 use state::PendingClipboard;
-use state::AppState;
 use storage::{init_data_dir, load_settings};
 use vault::{VaultManager, VaultStatus};
 
@@ -98,17 +98,13 @@ pub fn run() {
                 use tauri_plugin_global_shortcut::{
                     Builder as GlobalShortcutBuilder, ShortcutState,
                 };
-                match GlobalShortcutBuilder::new()
-                    .with_shortcuts(["CommandOrControl+Shift+D"])
-                {
+                match GlobalShortcutBuilder::new().with_shortcuts(["CommandOrControl+Shift+D"]) {
                     Ok(builder) => {
                         if let Err(e) = app.handle().plugin(
                             builder
                                 .with_handler(|app, _shortcut, event| {
                                     if event.state == ShortcutState::Pressed {
-                                        if let Some(window) =
-                                            app.get_webview_window("main")
-                                        {
+                                        if let Some(window) = app.get_webview_window("main") {
                                             let _ = window.show();
                                             let _ = window.set_focus();
                                         }
@@ -975,8 +971,7 @@ pub async fn start_network_services(
                         if let Some(session) =
                             sessions.iter_mut().find(|s| s.session_id == session_id)
                         {
-                            session.state =
-                                security::PairingState::Failed(error.clone());
+                            session.state = security::PairingState::Failed(error.clone());
                         }
                         drop(sessions);
                         let _ = app_handle_network.emit(

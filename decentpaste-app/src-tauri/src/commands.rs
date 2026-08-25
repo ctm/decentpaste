@@ -1140,9 +1140,7 @@ pub async fn ensure_connected(state: &AppState, timeout: Duration) -> Connection
     };
 
     // Count pending dials (after filtering out peers with no addresses)
-    state
-        .pending_dials
-        .store(addresses.len(), Ordering::SeqCst);
+    state.pending_dials.store(addresses.len(), Ordering::SeqCst);
 
     debug!(
         "Dialing {} disconnected peers (timeout: {:?})",
