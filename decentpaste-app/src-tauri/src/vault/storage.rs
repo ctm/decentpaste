@@ -110,11 +110,11 @@ pub fn write_vault(data: &VaultData, key: &VaultKey) -> Result<()> {
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rand::rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Encrypt
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_ref())
+        .encrypt(&nonce, plaintext.as_ref())
         .map_err(|e| DecentPasteError::Encryption(format!("Encryption failed: {}", e)))?;
 
     // Prepend nonce to ciphertext
@@ -153,14 +153,15 @@ pub fn read_vault(key: &VaultKey) -> Result<VaultData> {
 
     // Extract nonce and ciphertext
     let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce = Nonce::try_from(nonce_bytes)
+        .map_err(|_| DecentPasteError::Storage("Vault nonce invalid".into()))?;
 
     // Create cipher
     let cipher = Aes256Gcm::new_from_slice(key.as_bytes())
         .map_err(|e| DecentPasteError::Encryption(format!("Invalid key: {}", e)))?;
 
     // Decrypt
-    let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|_| {
+    let plaintext = cipher.decrypt(&nonce, ciphertext).map_err(|_| {
         // Decryption failure = wrong key (invalid PIN) or corrupted file
         DecentPasteError::InvalidPin
     })?;

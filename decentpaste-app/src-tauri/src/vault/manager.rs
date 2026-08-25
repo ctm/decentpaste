@@ -412,9 +412,9 @@ impl VaultManager {
 
         let mut nonce_bytes = [0u8; 12];
         rand::rng().fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
-        let ciphertext = cipher.encrypt(nonce, vault_key.as_ref()).map_err(|e| {
+        let ciphertext = cipher.encrypt(&nonce, vault_key.as_ref()).map_err(|e| {
             DecentPasteError::Encryption(format!("Vault key encryption failed: {}", e))
         })?;
 
@@ -455,11 +455,12 @@ impl VaultManager {
         let cipher = Aes256Gcm::new_from_slice(pin_derived_key)
             .map_err(|e| DecentPasteError::Encryption(format!("Invalid decryption key: {}", e)))?;
 
-        let nonce = Nonce::from_slice(&encrypted.nonce);
+        let nonce = Nonce::try_from(&encrypted.nonce[..])
+            .map_err(|_| DecentPasteError::Storage("Stored nonce invalid".into()))?;
 
         // Decryption failure indicates wrong PIN (wrong key = auth tag mismatch)
         let plaintext = cipher
-            .decrypt(nonce, encrypted.ciphertext.as_ref())
+            .decrypt(&nonce, encrypted.ciphertext.as_ref())
             .map_err(|_| DecentPasteError::InvalidPin)?;
 
         if plaintext.len() != 32 {

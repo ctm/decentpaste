@@ -1,4 +1,3 @@
-use aes_gcm::aead::OsRng;
 use chrono::Utc;
 use uuid::Uuid;
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -15,7 +14,7 @@ pub fn generate_device_identity(device_name: &str) -> DeviceIdentity {
     let device_id = Uuid::new_v4().to_string();
 
     // Generate X25519 keypair for ECDH key exchange during pairing
-    let private_key = StaticSecret::random_from_rng(OsRng);
+    let private_key = StaticSecret::random_from_rng(&mut rand::rng());
     let public_key = PublicKey::from(&private_key);
 
     DeviceIdentity {

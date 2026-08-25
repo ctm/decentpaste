@@ -1,7 +1,8 @@
 use aes_gcm::{
-    aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use rand::Rng;
 use sha2::{Digest, Sha256};
 
 use crate::error::{DecentPasteError, Result};
@@ -26,12 +27,12 @@ pub fn encrypt_content(content: &[u8], shared_secret: &[u8]) -> Result<Vec<u8>> 
 
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
-    OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    rand::rng().fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Encrypt
     let ciphertext = cipher
-        .encrypt(nonce, content)
+        .encrypt(&nonce, content)
         .map_err(|e| DecentPasteError::Encryption(e.to_string()))?;
 
     // Prepend nonce to ciphertext
@@ -56,11 +57,12 @@ pub fn decrypt_content(encrypted: &[u8], shared_secret: &[u8]) -> Result<Vec<u8>
 
     // Extract nonce and ciphertext
     let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce = Nonce::try_from(nonce_bytes)
+        .map_err(|_| DecentPasteError::Encryption("Invalid nonce".into()))?;
 
     // Decrypt
     cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| DecentPasteError::Encryption(e.to_string()))
 }
 
