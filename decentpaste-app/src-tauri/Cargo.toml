@@ -11,65 +11,55 @@ name = "decentpaste_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build.workspace = true
 
 [dependencies]
 # Tauri
-tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
-tauri-plugin-clipboard-manager = "2"
-tauri-plugin-os = "2"
-tauri-plugin-decentshare = { path = "../tauri-plugin-decentshare" }
-tauri-plugin-decentsecret = { path = "../tauri-plugin-decentsecret" }
+tauri = { workspace = true, features = ["tray-icon"] }
+tauri-plugin-opener.workspace = true
+tauri-plugin-updater.workspace = true
+tauri-plugin-process.workspace = true
+tauri-plugin-clipboard-manager.workspace = true
+tauri-plugin-os.workspace = true
+tauri-plugin-decentshare.workspace = true
+tauri-plugin-decentsecret.workspace = true
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 
 # Async runtime
-tokio = { version = "1", features = ["full", "sync"] }
+tokio.workspace = true
 
 # libp2p networking
-libp2p = { version = "0.56", features = [
-    "tokio",
-    "tcp",
-    "noise",
-    "yamux",
-    "mdns",
-    "gossipsub",
-    "request-response",
-    "identify",
-    "macros",
-] }
+libp2p.workspace = true
 
 # Cryptography
-aes-gcm = "0.10"
-argon2 = "0.5"
-rand = "0.10"
-sha2 = "0.11"
-hex = "0.4"
-x25519-dalek = { version = "2", features = ["static_secrets"] }
-zeroize = { version = "1.8", features = ["derive"] }
+aes-gcm.workspace = true
+argon2.workspace = true
+rand.workspace = true
+sha2.workspace = true
+hex.workspace = true
+x25519-dalek.workspace = true
+zeroize.workspace = true
 
 # Storage & utilities
-hostname = "0.4"
-thiserror = "2"
-anyhow = "1"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+hostname.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+uuid.workspace = true
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 # Async utilities
-futures = "0.3"
-async-trait = "0.1"
+futures.workspace = true
+async-trait.workspace = true
 
 # Desktop-only plugins
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-single-instance = "2"
-tauri-plugin-autostart = "2"
-tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance.workspace = true
+tauri-plugin-autostart.workspace = true
+tauri-plugin-global-shortcut.workspace = true
