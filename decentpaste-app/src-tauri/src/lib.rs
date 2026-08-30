@@ -1020,6 +1020,11 @@ pub async fn start_network_services(
                                         let is_foreground = true;
 
                                         if is_foreground {
+                                            // Prevent echo: register the hash *before* writing,
+                                            // or a poll landing between the two reads it back as
+                                            // a local change and re-broadcasts it to the sender.
+                                            clipboard_monitor.set_last_hash(hash.clone()).await;
+
                                             // Update local clipboard directly
                                             if let Err(e) =
                                                 clipboard::monitor::set_clipboard_content(
@@ -1029,10 +1034,6 @@ pub async fn start_network_services(
                                             {
                                                 error!("Failed to set clipboard: {}", e);
                                             }
-
-                                            // Prevent echo: tell the monitor about this hash
-                                            // so it won't treat it as a local change
-                                            clipboard_monitor.set_last_hash(hash.clone()).await;
                                         } else {
                                             // Mobile background: queue clipboard silently (no notification)
                                             // Clipboard will be copied when app resumes
