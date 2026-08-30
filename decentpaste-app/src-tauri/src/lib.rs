@@ -1318,6 +1318,11 @@ pub async fn start_network_services(
                                         };
 
                                         if !already_has {
+                                            // Prevent echo: register the hash *before* writing,
+                                            // or a poll landing between the two reads it back as
+                                            // a local change and re-broadcasts it to the sender.
+                                            clipboard_monitor.set_last_hash(hash.clone()).await;
+
                                             // Set clipboard
                                             if let Err(e) =
                                                 clipboard::monitor::set_clipboard_content(
@@ -1327,9 +1332,6 @@ pub async fn start_network_services(
                                             {
                                                 error!("Failed to set synced clipboard: {}", e);
                                             }
-
-                                            // Prevent echo
-                                            clipboard_monitor.set_last_hash(hash.clone()).await;
 
                                             // Add to history with correct timestamp
                                             let entry = ClipboardEntry::new_remote(
