@@ -369,6 +369,26 @@ async fn initialize_app(
     Ok(())
 }
 
+/// Clears `SERVICES_STARTED` if `start_network_services` bails out before finishing, so a
+/// failed start does not leave the app permanently unable to bring networking up again.
+struct ServicesStartGuard {
+    armed: bool,
+}
+
+impl Drop for ServicesStartGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            SERVICES_STARTED.store(false, Ordering::SeqCst);
+        }
+    }
+}
+
+/// Mark network services as stopped so a later unlock starts them again.
+/// Called by `lock_vault` after it has torn the services down.
+pub fn mark_services_stopped() {
+    SERVICES_STARTED.store(false, Ordering::SeqCst);
+}
+
 /// Start network and clipboard services after vault is unlocked.
 /// This is called from unlock_vault/setup_vault commands.
 pub async fn start_network_services(
@@ -379,6 +399,10 @@ pub async fn start_network_services(
         warn!("Network services already started, skipping");
         return Ok(());
     }
+
+    // If anything below fails we must clear the flag, or the app can never start
+    // networking again for the rest of the process lifetime.
+    let mut start_guard = ServicesStartGuard { armed: true };
 
     let state = app_handle.state::<AppState>();
 
@@ -451,6 +475,12 @@ pub async fn start_network_services(
         .start(app_handle.clone(), clipboard_tx)
         .await;
     let clipboard_monitor_network = clipboard_monitor.clone();
+
+    // Keep a handle so locking the vault can stop the monitor
+    {
+        let mut stored = state.clipboard_monitor.write().await;
+        *stored = Some(clipboard_monitor.clone());
+    }
 
     // Handle clipboard changes - broadcast to network
     let app_handle_clipboard = app_handle.clone();
@@ -1343,6 +1373,7 @@ pub async fn start_network_services(
         }
     });
 
+    start_guard.armed = false;
     info!("Network services started successfully");
     Ok(())
 }
