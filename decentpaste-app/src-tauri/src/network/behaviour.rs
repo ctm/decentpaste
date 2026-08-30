@@ -149,9 +149,11 @@ impl DecentPasteBehaviour {
         .map_err(|e| format!("Failed to create gossipsub behaviour: {}", e))?;
 
         // Request-response for pairing
+        // The challenge is sent as the response to an inbound request, produced only after
+        // the user accepts, so the default 10s timeout would cancel pairing mid-prompt.
         let request_response = request_response::Behaviour::new(
             [(StreamProtocol::new(PROTOCOL_NAME), ProtocolSupport::Full)],
-            request_response::Config::default(),
+            request_response::Config::default().with_request_timeout(Duration::from_secs(120)),
         );
 
         // Identify for peer identification
