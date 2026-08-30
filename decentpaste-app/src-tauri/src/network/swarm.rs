@@ -840,6 +840,13 @@ impl NetworkManager {
                     }
                     Err(e) => {
                         warn!("Failed to broadcast clipboard: {}", e);
+                        let _ = self
+                            .event_tx
+                            .send(NetworkEvent::ClipboardSendFailed {
+                                id: message.id,
+                                reason: e.to_string(),
+                            })
+                            .await;
                     }
                 }
             }

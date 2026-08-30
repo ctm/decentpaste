@@ -887,6 +887,10 @@ class App {
       store.addToast(`Network error: ${error}`, 'error');
     });
 
+    eventManager.on('clipboardSendFailed', (payload) => {
+      store.addToast(`Copy not synced: ${payload.reason}`, 'error');
+    });
+
     // Handle app minimized to tray (desktop only)
     eventManager.on('appMinimizedToTray', () => {
       store.set('isWindowVisible', false);

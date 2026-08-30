@@ -1095,6 +1095,17 @@ pub async fn start_network_services(
                     );
                 }
 
+                NetworkEvent::ClipboardSendFailed { id, reason } => {
+                    warn!("Clipboard {} was not delivered: {}", id, reason);
+                    let _ = app_handle_network.emit(
+                        "clipboard-send-failed",
+                        serde_json::json!({
+                            "id": id,
+                            "reason": reason,
+                        }),
+                    );
+                }
+
                 NetworkEvent::Error(error) => {
                     let _ = app_handle_network.emit("network-error", error);
                 }

@@ -1219,6 +1219,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
+ "base64 0.23.1",
  "chrono",
  "futures",
  "hex",

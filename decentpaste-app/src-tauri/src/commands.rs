@@ -1314,7 +1314,7 @@ async fn share_clipboard_content(
     use tauri::Emitter;
 
     // Limit clipboard content size to prevent memory exhaustion (1MB max)
-    const MAX_CLIPBOARD_SIZE: usize = 1024 * 1024;
+    use crate::network::MAX_CLIPBOARD_CONTENT_BYTES as MAX_CLIPBOARD_SIZE;
     if content.len() > MAX_CLIPBOARD_SIZE {
         return Err(DecentPasteError::InvalidInput(
             "Clipboard content too large (max 1MB)".into(),

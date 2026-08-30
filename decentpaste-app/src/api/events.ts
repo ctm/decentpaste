@@ -2,6 +2,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import type {
   ClipboardBroadcastPayload,
   ClipboardEntry,
+  ClipboardSendFailedPayload,
   DiscoveredPeer,
   NetworkStatus,
   PairingCompletePayload,
@@ -37,6 +38,7 @@ interface EventListeners {
   clipboardReceived: EventHandler<ClipboardEntry>[];
   clipboardSent: EventHandler<ClipboardEntry>[];
   clipboardBroadcast: EventHandler<ClipboardBroadcastPayload>[];
+  clipboardSendFailed: EventHandler<ClipboardSendFailedPayload>[];
   clipboardSyncedFromBackground: EventHandler<ClipboardSyncedFromBackgroundPayload>[];
   networkError: EventHandler<string>[];
   appMinimizedToTray: EventHandler<void>[];
@@ -57,6 +59,7 @@ class EventManager {
     clipboardReceived: [],
     clipboardSent: [],
     clipboardBroadcast: [],
+    clipboardSendFailed: [],
     clipboardSyncedFromBackground: [],
     networkError: [],
     appMinimizedToTray: [],
@@ -100,6 +103,9 @@ class EventManager {
       }),
       listen<ClipboardBroadcastPayload>('clipboard-broadcast', (e) => {
         this.listeners.clipboardBroadcast.forEach((fn) => fn(e.payload));
+      }),
+      listen<ClipboardSendFailedPayload>('clipboard-send-failed', (e) => {
+        this.listeners.clipboardSendFailed.forEach((fn) => fn(e.payload));
       }),
       listen<ClipboardSyncedFromBackgroundPayload>('clipboard-synced-from-background', (e) => {
         this.listeners.clipboardSyncedFromBackground.forEach((fn) => fn(e.payload));

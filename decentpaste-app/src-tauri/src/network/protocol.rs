@@ -1,6 +1,36 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Largest clipboard content we will sync, in bytes.
+///
+/// This and [`GOSSIPSUB_MAX_TRANSMIT_SIZE`] are two halves of one budget: content is
+/// AES-GCM encrypted (+28 bytes), base64 encoded (~1.34x) and wrapped in a JSON envelope,
+/// so the wire size is roughly 1.4x the content. The transmit size must stay above that
+/// product or large copies fail to publish.
+pub const MAX_CLIPBOARD_CONTENT_BYTES: usize = 1024 * 1024;
+
+/// Maximum gossipsub RPC size. libp2p defaults to 64 KiB, which silently capped clipboard
+/// sync far below [`MAX_CLIPBOARD_CONTENT_BYTES`].
+pub const GOSSIPSUB_MAX_TRANSMIT_SIZE: usize = 2 * 1024 * 1024;
+
+/// Serializes `Vec<u8>` as a base64 string rather than a JSON array of decimal numbers.
+/// The array form costs ~3.6 wire bytes per payload byte; base64 costs ~1.34.
+mod base64_bytes {
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        let encoded = String::deserialize(deserializer)?;
+        base64::engine::general_purpose::STANDARD
+            .decode(&encoded)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProtocolMessage {
     Pairing(PairingMessage),
@@ -87,6 +117,7 @@ pub struct PairingConfirm {
 pub struct ClipboardMessage {
     pub id: String,
     pub content_hash: String,
+    #[serde(with = "base64_bytes")]
     pub encrypted_content: Vec<u8>,
     pub timestamp: DateTime<Utc>,
     pub origin_device_id: String,

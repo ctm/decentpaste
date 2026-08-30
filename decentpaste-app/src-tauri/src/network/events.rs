@@ -86,6 +86,12 @@ pub enum NetworkEvent {
         id: String,
         peer_count: usize,
     },
+    /// A clipboard broadcast could not be published. Emitted so the user learns the copy
+    /// never left the device instead of it silently appearing synced.
+    ClipboardSendFailed {
+        id: String,
+        reason: String,
+    },
 
     // Status events
     StatusChanged(NetworkStatus),
