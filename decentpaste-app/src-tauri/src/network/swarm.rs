@@ -22,6 +22,9 @@ use super::protocol::{ClipboardMessage, DeviceAnnounceMessage, PairingMessage, P
 pub enum NetworkCommand {
     StartListening,
     StopListening,
+    /// Tear down the swarm and end the manager task. Sent when the vault is locked so no
+    /// clipboard traffic continues behind the lock screen.
+    Shutdown,
     SendPairingRequest {
         peer_id: String,
         message: Vec<u8>,
@@ -198,6 +201,10 @@ impl NetworkManager {
 
                 // Handle commands
                 Some(command) = self.command_rx.recv() => {
+                    if matches!(command, NetworkCommand::Shutdown) {
+                        info!("Network manager shutting down");
+                        return;
+                    }
                     self.handle_command(command).await;
                 }
             }
@@ -840,6 +847,13 @@ impl NetworkManager {
                     }
                     Err(e) => {
                         warn!("Failed to broadcast clipboard: {}", e);
+                        let _ = self
+                            .event_tx
+                            .send(NetworkEvent::ClipboardSendFailed {
+                                id: message.id,
+                                reason: e.to_string(),
+                            })
+                            .await;
                     }
                 }
             }
@@ -1078,6 +1092,9 @@ impl NetworkManager {
                     paired_peer_addresses.len()
                 );
             }
+
+            // Handled in `run()`, which returns before dispatching here.
+            NetworkCommand::Shutdown => {}
 
             NetworkCommand::StartListening | NetworkCommand::StopListening => {
                 // Already handled during initialization

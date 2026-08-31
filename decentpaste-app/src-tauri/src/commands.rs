@@ -944,10 +944,27 @@ pub async fn unlock_vault(
 pub async fn lock_vault(app_handle: AppHandle, state: State<'_, AppState>) -> Result<()> {
     use tracing::info;
 
+    use zeroize::Zeroize;
+
     info!("Locking vault");
 
     // Flush current state to vault before locking (safety net - data should already be persisted)
     let _ = state.flush_all_to_vault().await;
+
+    // Stop network and clipboard services. Without this, sync continues behind the lock
+    // screen and every received entry is dropped, because flushing needs an open vault.
+    {
+        let tx = state.network_command_tx.write().await.take();
+        if let Some(tx) = tx {
+            let _ = tx.send(NetworkCommand::Shutdown).await;
+        }
+    }
+    if let Some(monitor) = state.clipboard_monitor.write().await.take() {
+        monitor.stop().await;
+    }
+
+    // Clear the start guard so unlocking brings the services back up.
+    crate::mark_services_stopped();
 
     // Lock the vault (clears encryption key from memory)
     {
@@ -957,6 +974,31 @@ pub async fn lock_vault(app_handle: AppHandle, state: State<'_, AppState>) -> Re
         }
         *manager = None;
     }
+
+    // Wipe key material and plaintext history from memory - the lock is meaningless if
+    // the per-peer shared secrets and the device private key stay resident.
+    {
+        let mut paired_peers = state.paired_peers.write().await;
+        for peer in paired_peers.iter_mut() {
+            peer.shared_secret.zeroize();
+        }
+        paired_peers.clear();
+    }
+    {
+        let mut device_identity = state.device_identity.write().await;
+        if let Some(identity) = device_identity.as_mut() {
+            if let Some(private_key) = identity.private_key.as_mut() {
+                private_key.zeroize();
+            }
+        }
+        *device_identity = None;
+    }
+    state.clipboard_history.write().await.clear();
+    state.message_buffers.write().await.clear();
+    state.ready_peers.write().await.clear();
+    state.discovered_peers.write().await.clear();
+    state.pairing_sessions.write().await.clear();
+
 
     // Update status
     {
@@ -1314,7 +1356,7 @@ async fn share_clipboard_content(
     use tauri::Emitter;
 
     // Limit clipboard content size to prevent memory exhaustion (1MB max)
-    const MAX_CLIPBOARD_SIZE: usize = 1024 * 1024;
+    use crate::network::MAX_CLIPBOARD_CONTENT_BYTES as MAX_CLIPBOARD_SIZE;
     if content.len() > MAX_CLIPBOARD_SIZE {
         return Err(DecentPasteError::InvalidInput(
             "Clipboard content too large (max 1MB)".into(),

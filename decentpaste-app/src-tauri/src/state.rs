@@ -52,6 +52,8 @@ pub struct AppState {
     pub vault_status: Arc<RwLock<VaultStatus>>,
     /// VaultManager instance for encrypted storage (only present when vault is open)
     pub vault_manager: Arc<RwLock<Option<VaultManager>>>,
+    /// Running clipboard monitor, kept so locking the vault can stop it.
+    pub clipboard_monitor: Arc<RwLock<Option<Arc<crate::clipboard::ClipboardMonitor>>>>,
 
     // =========================================================================
     // Connection Management State
@@ -95,6 +97,7 @@ impl AppState {
             ready_peers: Arc::new(RwLock::new(HashSet::new())), // No peers ready initially
             vault_status: Arc::new(RwLock::new(VaultStatus::NotSetup)), // Vault starts as not setup
             vault_manager: Arc::new(RwLock::new(None)), // No vault manager until unlocked
+            clipboard_monitor: Arc::new(RwLock::new(None)), // Set when services start
 
             // Connection management
             reconnect_in_progress: AtomicBool::new(false),

@@ -369,6 +369,26 @@ async fn initialize_app(
     Ok(())
 }
 
+/// Clears `SERVICES_STARTED` if `start_network_services` bails out before finishing, so a
+/// failed start does not leave the app permanently unable to bring networking up again.
+struct ServicesStartGuard {
+    armed: bool,
+}
+
+impl Drop for ServicesStartGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            SERVICES_STARTED.store(false, Ordering::SeqCst);
+        }
+    }
+}
+
+/// Mark network services as stopped so a later unlock starts them again.
+/// Called by `lock_vault` after it has torn the services down.
+pub fn mark_services_stopped() {
+    SERVICES_STARTED.store(false, Ordering::SeqCst);
+}
+
 /// Start network and clipboard services after vault is unlocked.
 /// This is called from unlock_vault/setup_vault commands.
 pub async fn start_network_services(
@@ -379,6 +399,10 @@ pub async fn start_network_services(
         warn!("Network services already started, skipping");
         return Ok(());
     }
+
+    // If anything below fails we must clear the flag, or the app can never start
+    // networking again for the rest of the process lifetime.
+    let mut start_guard = ServicesStartGuard { armed: true };
 
     let state = app_handle.state::<AppState>();
 
@@ -451,6 +475,12 @@ pub async fn start_network_services(
         .start(app_handle.clone(), clipboard_tx)
         .await;
     let clipboard_monitor_network = clipboard_monitor.clone();
+
+    // Keep a handle so locking the vault can stop the monitor
+    {
+        let mut stored = state.clipboard_monitor.write().await;
+        *stored = Some(clipboard_monitor.clone());
+    }
 
     // Handle clipboard changes - broadcast to network
     let app_handle_clipboard = app_handle.clone();
@@ -1020,6 +1050,11 @@ pub async fn start_network_services(
                                         let is_foreground = true;
 
                                         if is_foreground {
+                                            // Prevent echo: register the hash *before* writing,
+                                            // or a poll landing between the two reads it back as
+                                            // a local change and re-broadcasts it to the sender.
+                                            clipboard_monitor.set_last_hash(hash.clone()).await;
+
                                             // Update local clipboard directly
                                             if let Err(e) =
                                                 clipboard::monitor::set_clipboard_content(
@@ -1029,10 +1064,6 @@ pub async fn start_network_services(
                                             {
                                                 error!("Failed to set clipboard: {}", e);
                                             }
-
-                                            // Prevent echo: tell the monitor about this hash
-                                            // so it won't treat it as a local change
-                                            clipboard_monitor.set_last_hash(hash.clone()).await;
                                         } else {
                                             // Mobile background: queue clipboard silently (no notification)
                                             // Clipboard will be copied when app resumes
@@ -1091,6 +1122,17 @@ pub async fn start_network_services(
                         serde_json::json!({
                             "id": id,
                             "peerCount": peer_count,
+                        }),
+                    );
+                }
+
+                NetworkEvent::ClipboardSendFailed { id, reason } => {
+                    warn!("Clipboard {} was not delivered: {}", id, reason);
+                    let _ = app_handle_network.emit(
+                        "clipboard-send-failed",
+                        serde_json::json!({
+                            "id": id,
+                            "reason": reason,
                         }),
                     );
                 }
@@ -1276,6 +1318,11 @@ pub async fn start_network_services(
                                         };
 
                                         if !already_has {
+                                            // Prevent echo: register the hash *before* writing,
+                                            // or a poll landing between the two reads it back as
+                                            // a local change and re-broadcasts it to the sender.
+                                            clipboard_monitor.set_last_hash(hash.clone()).await;
+
                                             // Set clipboard
                                             if let Err(e) =
                                                 clipboard::monitor::set_clipboard_content(
@@ -1285,9 +1332,6 @@ pub async fn start_network_services(
                                             {
                                                 error!("Failed to set synced clipboard: {}", e);
                                             }
-
-                                            // Prevent echo
-                                            clipboard_monitor.set_last_hash(hash.clone()).await;
 
                                             // Add to history with correct timestamp
                                             let entry = ClipboardEntry::new_remote(
@@ -1331,6 +1375,7 @@ pub async fn start_network_services(
         }
     });
 
+    start_guard.armed = false;
     info!("Network services started successfully");
     Ok(())
 }

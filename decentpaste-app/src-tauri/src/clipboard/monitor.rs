@@ -60,7 +60,7 @@ impl ClipboardMonitor {
                 // Note: On Android/iOS, the Rust clipboard API may not work for reading.
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 {
-                    const MAX_CLIPBOARD_SIZE: usize = 1024 * 1024; // 1MB limit
+                    use crate::network::MAX_CLIPBOARD_CONTENT_BYTES as MAX_CLIPBOARD_SIZE;
                     match app_handle.clipboard().read_text() {
                         Ok(text) => {
                             if !text.is_empty() && text.len() <= MAX_CLIPBOARD_SIZE {

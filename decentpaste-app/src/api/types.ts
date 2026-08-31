@@ -120,6 +120,11 @@ export interface ClipboardBroadcastPayload {
   peerCount: number;
 }
 
+export interface ClipboardSendFailedPayload {
+  id: string;
+  reason: string;
+}
+
 export interface PeerNameUpdatedPayload {
   peerId: string;
   deviceName: string;

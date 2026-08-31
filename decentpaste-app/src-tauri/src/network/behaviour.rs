@@ -125,6 +125,7 @@ impl DecentPasteBehaviour {
             // This is important for quick clipboard sync after peer restart
             .heartbeat_interval(Duration::from_secs(1))
             .validation_mode(gossipsub::ValidationMode::Strict)
+            .max_transmit_size(super::protocol::GOSSIPSUB_MAX_TRANSMIT_SIZE)
             .message_id_fn(|message| {
                 // For clipboard messages: use the message's own UUID as the MessageId
                 // This makes each broadcast unique, allowing resending same content.
