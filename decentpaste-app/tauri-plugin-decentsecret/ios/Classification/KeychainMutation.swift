@@ -41,6 +41,24 @@ public enum KeychainMutation {
         classify(status: status, failedTo: "store")
     }
 
+    /// Whether an `OSStatus` from the `SecItemDelete` that removes the secret
+    /// leaves the item gone.
+    ///
+    /// `errSecItemNotFound` is a successful delete: the item is absent, which
+    /// is the whole of what was asked for. Saying so is what keeps the delete
+    /// idempotent, and `storeSecret` depends on that -- it deletes before it
+    /// writes, so a not-found counted as a failure would fail the first store
+    /// on every device.
+    public static func deleteSucceeded(_ status: OSStatus) -> Bool {
+        status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    /// Classify a status `deleteSucceeded` rejects, i.e. one that left the
+    /// item where it was.
+    public static func deleteFailure(status: OSStatus) -> String {
+        classify(status: status, failedTo: "delete")
+    }
+
     /// The arms shared by every mutation. `verb` completes "Failed to ...
     /// secret", which is the unprefixed fallback: no code in
     /// `map_plugin_error`'s vocabulary fits, so the Rust side keeps the whole

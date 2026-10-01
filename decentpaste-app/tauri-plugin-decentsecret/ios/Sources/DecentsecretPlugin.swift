@@ -75,8 +75,13 @@ class DecentsecretPlugin: Plugin {
             let args = try invoke.parseArgs(StoreSecretArgs.self)
             let secretData = Data(args.secret.map { UInt8($0 & 0xFF) })
 
-            // Delete any existing item first
-            deleteFromKeychain()
+            // Delete any existing pair first. The status is discarded on
+            // purpose: a secret that survived the delete is reported by the
+            // SecItemAdd below, as the errSecDuplicateItem it then returns,
+            // and a surviving record is overwritten further down by
+            // storeBiometricEnrollment. Rejecting here would instead fail
+            // stores that recover today.
+            _ = deleteFromKeychain()
 
             // Create access control with biometric protection
             var accessControlError: Unmanaged<CFError>?
@@ -170,7 +175,10 @@ class DecentsecretPlugin: Plugin {
     // MARK: - Delete Secret
 
     @objc public func deleteSecret(_ invoke: Invoke) throws {
-        deleteFromKeychain()
+        if let status = deleteFromKeychain() {
+            invoke.reject(KeychainMutation.deleteFailure(status: status))
+            return
+        }
         invoke.resolve([:])
     }
 
@@ -278,16 +286,31 @@ class DecentsecretPlugin: Plugin {
     // MARK: - Private Helpers
 
     /// Delete the secret and its fingerprint together, so that the two have
-    /// exactly the same lifetime.
-    private func deleteFromKeychain() {
+    /// exactly the same lifetime. Returns nil once neither item is there --
+    /// which a not-found counts as, so that the delete stays idempotent --
+    /// and otherwise the first status that left one of them where it was.
+    ///
+    /// Both deletes are attempted whatever the first one returns. A record
+    /// left behind because the secret would not go, or the other way round,
+    /// is the desynchronization this pairing exists to prevent: a record
+    /// outliving its secret is measured against the current enrollment by the
+    /// next retrieval, which is where a false `BIOMETRIC_CHANGED` comes from.
+    private func deleteFromKeychain() -> OSStatus? {
+        var failure: OSStatus?
+
         for account in [kAccountName, kDomainStateAccountName] {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: kServiceName,
                 kSecAttrAccount as String: account
             ]
-            SecItemDelete(query as CFDictionary)
+            let status = SecItemDelete(query as CFDictionary)
+            if !KeychainMutation.deleteSucceeded(status), failure == nil {
+                failure = status
+            }
         }
+
+        return failure
     }
 }
 
