@@ -109,7 +109,8 @@ class DecentsecretPlugin: Plugin {
                 invoke.resolve([:])
             } else {
                 let errorMsg = securityErrorMessage(status)
-                invoke.reject("Failed to store secret: \(errorMsg)")
+                invoke.reject(
+                    failureMessage("Failed to store secret: \(errorMsg)", status: status))
             }
 
         } catch {

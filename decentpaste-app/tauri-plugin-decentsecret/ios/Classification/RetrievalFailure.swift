@@ -41,7 +41,9 @@ public enum RetrievalFailure {
         currentDomainState: Data?
     ) -> String {
         if let stored = storedDomainState, let current = currentDomainState, stored != current {
-            return "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change"
+            return failureMessage(
+                "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change",
+                status: status)
         }
         return statusFailure(status)
     }
@@ -49,21 +51,32 @@ public enum RetrievalFailure {
     private static func statusFailure(_ status: OSStatus) -> String {
         switch status {
         case errSecItemNotFound:
-            return "NOT_FOUND: No secret stored"
+            return failureMessage("NOT_FOUND: No secret stored", status: status)
 
         case errSecUserCanceled:
-            return "USER_CANCELLED: User cancelled authentication"
+            return failureMessage("USER_CANCELLED: User cancelled authentication", status: status)
 
         case errSecAuthFailed:
-            return "AUTH_FAILED: Authentication failed"
+            return failureMessage("AUTH_FAILED: Authentication failed", status: status)
 
         default:
-            return "Failed to retrieve secret: \(securityErrorMessage(status))"
+            return failureMessage(
+                "Failed to retrieve secret: \(securityErrorMessage(status))", status: status)
         }
     }
 }
 
 // MARK: - Status Messages
+
+/// A failure message with the raw status appended.
+///
+/// The number is what makes a field report unambiguous: iOS has no status that
+/// means "invalidated", so which status it does return for any given failure is
+/// only knowable by measuring it on a device. It goes at the end so that the
+/// `ERROR_CODE:` prefix stays first, where `map_plugin_error` looks for it.
+public func failureMessage(_ reason: String, status: OSStatus) -> String {
+    "\(reason) (OSStatus \(status))"
+}
 
 /// The system's description of an `OSStatus`, or a last-resort rendering of the
 /// raw number when the system has no message for it.
