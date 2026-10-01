@@ -25,8 +25,13 @@ let package = Package(
         .target(
             name: "tauri-plugin-decentsecret",
             dependencies: [
-                .byName(name: "Tauri")
+                .byName(name: "Tauri"),
+                .byName(name: "DecentsecretClassification")
             ],
-            path: "Sources")
+            path: "Sources"),
+        // Dependency-free so that it can be unit tested without Tauri or a device.
+        .target(
+            name: "DecentsecretClassification",
+            path: "Classification")
     ]
 )

@@ -3,6 +3,7 @@ import Tauri
 import UIKit
 import LocalAuthentication
 import Security
+import DecentsecretClassification
 
 // MARK: - Argument Types
 
@@ -138,26 +139,8 @@ class DecentsecretPlugin: Plugin {
                 invoke.reject("NOT_FOUND: Secret data is corrupted")
             }
 
-        case errSecItemNotFound:
-            invoke.reject("NOT_FOUND: No secret stored")
-
-        case errSecUserCanceled:
-            invoke.reject("USER_CANCELLED: User cancelled authentication")
-
-        case errSecAuthFailed:
-            invoke.reject("AUTH_FAILED: Authentication failed")
-
-        case -25293: // errSecInvalidKeychain - often indicates biometric change
-            invoke.reject("BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change")
-
         default:
-            // Check if it's a biometric invalidation error
-            let errorMsg = securityErrorMessage(status)
-            if errorMsg.contains("invalidat") || errorMsg.contains("LAError") {
-                invoke.reject("BIOMETRIC_CHANGED: \(errorMsg)")
-            } else {
-                invoke.reject("Failed to retrieve secret: \(errorMsg)")
-            }
+            invoke.reject(RetrievalFailure.classify(status: status))
         }
     }
 
@@ -177,13 +160,6 @@ class DecentsecretPlugin: Plugin {
             kSecAttrAccount as String: kAccountName
         ]
         SecItemDelete(query as CFDictionary)
-    }
-
-    private func securityErrorMessage(_ status: OSStatus) -> String {
-        if let errorMessage = SecCopyErrorMessageString(status, nil) as String? {
-            return errorMessage
-        }
-        return "Security error: \(status)"
     }
 }
 
