@@ -263,10 +263,27 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
         secretBytes: ByteArray? = null,
         encryptedData: ByteArray? = null
     ) {
-        // The map holds the invoke from here on, so a command that fails
-        // before the prompt -- an invalidated key above all -- leaves nothing
-        // in it: this is the only place that puts an entry there, and every
-        // path out of here removes it.
+        // This is the only place that puts an entry in the map, and it does
+        // so once the cipher is initialized and the prompt is about to be
+        // shown, so a command that fails before that -- an invalidated key
+        // above all -- rejects an Invoke the map never held. Every terminal
+        // callback removes the entry as its first statement, and the
+        // FragmentActivity guard removes it to reject through it;
+        // onAuthenticationFailed is not terminal and leaves it in place for
+        // the next attempt.
+        //
+        // Three windows do strand an entry. A throw between the insert below
+        // and authenticate() -- getMainExecutor, the PromptInfo build, the
+        // runOnUiThread scheduling -- reaches the command's catch, which
+        // rejects the Invoke, but nothing removes the entry. A throw inside
+        // the runOnUiThread lambda reaches that catch only if the command was
+        // already on the main thread, where the lambda runs inline; posted to
+        // the looper instead it reaches nothing, so the Invoke is never
+        // answered at all. Nor is it when the prompt produces no terminal
+        // callback, as when the process is backgrounded or killed.
+        // A stranded entry holds its Invoke for the life of the process, and
+        // because the key is unique it strands that one entry only: no later
+        // call can land on it or answer through it.
         val invokeId = nextInvokeId.incrementAndGet().toString()
         pendingInvokes[invokeId] = pendingInvoke
 
