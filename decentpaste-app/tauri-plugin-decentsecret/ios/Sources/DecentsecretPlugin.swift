@@ -31,9 +31,6 @@ class DecentsecretPlugin: Plugin {
 
         // Check if biometric authentication is available
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            // Check the biometry type
-            let biometryType = context.biometryType
-
             invoke.resolve([
                 "available": true,
                 "method": "iOSBiometric",
