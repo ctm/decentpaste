@@ -63,6 +63,20 @@ public enum RetrievalFailure {
         return statusFailure(status)
     }
 
+    /// The failure a read that succeeded with a result that is not `Data`
+    /// reports: the lookup found the item and the authentication passed, so
+    /// nothing but the payload is wrong, and no status describes that.
+    ///
+    /// Deliberately carries no code. `NOT_FOUND` would say the vault is empty
+    /// when it is merely unreadable, and an empty vault is writable, so the
+    /// embedding app would set up a new one over a vault nothing has read;
+    /// none of the other codes `map_plugin_error` knows fits either.
+    /// Unprefixed, the message stays a plugin-level failure, which is loud
+    /// and leaves the vault unread.
+    public static func unreadableSecret(status: OSStatus) -> String {
+        failureMessage("Failed to retrieve secret: Secret data is corrupted", status: status)
+    }
+
     /// The failure the status alone names.
     ///
     /// The two arms that name the environment rather than the operation are

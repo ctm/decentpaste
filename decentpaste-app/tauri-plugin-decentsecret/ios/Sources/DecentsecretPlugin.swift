@@ -160,7 +160,7 @@ class DecentsecretPlugin: Plugin {
                 let secretArray = data.map { Int($0) }
                 invoke.resolve(["secret": secretArray])
             } else {
-                invoke.reject("NOT_FOUND: Secret data is corrupted")
+                invoke.reject(RetrievalFailure.unreadableSecret(status: status))
             }
 
         default:

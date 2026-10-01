@@ -351,6 +351,39 @@ final class RetrievalFailureTests: XCTestCase {
             "AUTH_FAILED: Authentication failed (OSStatus -25293)")
     }
 
+    // MARK: - A Read That Returned Something Other Than Data
+
+    /// A successful read whose result is not `Data`, whole: the fallback
+    /// wording the Rust side keeps as a plugin failure, and the status that
+    /// says the lookup itself succeeded.
+    func testAnUnreadableSecretIsReportedWithTheStatusOfTheReadThatFoundIt() {
+        XCTAssertEqual(
+            RetrievalFailure.unreadableSecret(status: errSecSuccess),
+            "Failed to retrieve secret: Secret data is corrupted (OSStatus 0)")
+    }
+
+    /// And it reports neither a missing secret nor a changed enrollment,
+    /// whatever status the read came back with.
+    ///
+    /// Those are the two answers that authorise a write: `NOT_FOUND` says the
+    /// vault is empty, which is writable, and `BIOMETRIC_CHANGED` says it can
+    /// never be read again. An item whose payload will not read is neither --
+    /// it is a vault nothing has read -- so this arm must keep clear of both.
+    /// The sweep is over the statuses rather than `errSecSuccess` alone
+    /// because the properties are of the arm, not of the one status that
+    /// reaches it today.
+    func testAnUnreadableSecretReportsNeitherAMissingSecretNorAChange() {
+        for status in [errSecSuccess] + keychainStatuses {
+            let message = RetrievalFailure.unreadableSecret(status: status)
+
+            XCTAssertFalse(message.contains("NOT_FOUND"), "\(status): \(message)")
+            XCTAssertFalse(message.contains("BIOMETRIC_CHANGED"), "\(status): \(message)")
+            XCTAssertEqual(
+                recognizedCodes.filter { message.contains($0) }, [], "\(status): \(message)")
+            XCTAssertTrue(message.hasSuffix(" (OSStatus \(status))"), "\(status): \(message)")
+        }
+    }
+
     // MARK: - The Properties Every Message Keeps
 
     /// The number is appended, never substituted, so every report carries the
