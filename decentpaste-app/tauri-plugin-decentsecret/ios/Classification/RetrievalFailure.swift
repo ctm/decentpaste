@@ -17,30 +17,44 @@ public enum RetrievalFailure {
 
     /// Classify a non-success `OSStatus` from `SecItemCopyMatching`.
     ///
-    /// `storedDomainState` is the biometric enrollment fingerprint recorded
-    /// when the secret was stored and `currentDomainState` is the device's
-    /// fingerprint now; both are `LAContext.evaluatedPolicyDomainState`
-    /// values.
+    /// `storedEnrollment` is the raw record found beside the secret, as
+    /// written by `BiometricEnrollment.encoded()`, and `currentEnrollment` is
+    /// the enrollment this device is on now.
     ///
-    /// Two fingerprints that are present and differ mean the enrollment
-    /// changed, which invalidated the item, because it is stored with
-    /// `[.biometryCurrentSet]`. That comparison is made ahead of the status
-    /// deliberately: iOS reports the invalidation with no distinguishable
-    /// status, so no status -- `errSecItemNotFound` included -- is evidence
-    /// against a changed enrollment.
+    /// Two fingerprints that are present, were read on the same major OS
+    /// version and differ mean the enrollment changed, which invalidated the
+    /// item, because it is stored with `[.biometryCurrentSet]`. That
+    /// comparison is made ahead of the status deliberately: iOS reports the
+    /// invalidation with no distinguishable status, so no status --
+    /// `errSecItemNotFound` included -- is evidence against a changed
+    /// enrollment.
     ///
-    /// A fingerprint absent on either side, however, is not evidence *of* a
-    /// change, and must never yield `BIOMETRIC_CHANGED`. Installs made before
-    /// the fingerprint was recorded have a secret and no stored value, and
-    /// `evaluatedPolicyDomainState` is nil whenever biometry cannot be
-    /// evaluated at all. Claiming a reset in those cases would tell the caller
-    /// to write over a vault it had never read.
+    /// Anything short of that, however, is not evidence *of* a change, and
+    /// must never yield `BIOMETRIC_CHANGED`:
+    ///
+    /// - No stored record. Installs made before the fingerprint was recorded
+    ///   have a secret and nothing beside it.
+    /// - A stored record that does not decode: the bare fingerprint earlier
+    ///   builds wrote, or a format from a later one.
+    /// - No current enrollment. `evaluatedPolicyDomainState` is nil whenever
+    ///   biometry cannot be evaluated at all.
+    /// - A stored major OS version that is not the current one. Apple warns
+    ///   that the fingerprint "can change exceptionally between major OS
+    ///   versions even if the state of biometry has not changed", so across
+    ///   majors a difference says nothing.
+    ///
+    /// Each of those falls through to the status, because claiming a reset
+    /// would tell the caller to write over a vault it had never read.
     public static func classify(
         status: OSStatus,
-        storedDomainState: Data?,
-        currentDomainState: Data?
+        storedEnrollment: Data?,
+        currentEnrollment: BiometricEnrollment?
     ) -> String {
-        if let stored = storedDomainState, let current = currentDomainState, stored != current {
+        if let stored = storedEnrollment.flatMap(BiometricEnrollment.init(encoded:)),
+            let current = currentEnrollment,
+            stored.osMajorVersion == current.osMajorVersion,
+            stored.domainState != current.domainState
+        {
             return failureMessage(
                 "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change",
                 status: status)

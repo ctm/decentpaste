@@ -102,7 +102,7 @@ class DecentsecretPlugin: Plugin {
                 // Only once the secret is really there: a fingerprint without
                 // a secret would make the next retrieval's errSecItemNotFound
                 // look like a changed enrollment.
-                storeBiometricDomainState()
+                storeBiometricEnrollment()
                 invoke.resolve([:])
             } else {
                 let errorMsg = securityErrorMessage(status)
@@ -147,8 +147,8 @@ class DecentsecretPlugin: Plugin {
         default:
             invoke.reject(RetrievalFailure.classify(
                 status: status,
-                storedDomainState: storedBiometricDomainState(),
-                currentDomainState: currentBiometricDomainState()
+                storedEnrollment: storedBiometricEnrollment(),
+                currentEnrollment: currentBiometricEnrollment()
             ))
         }
     }
@@ -176,7 +176,19 @@ class DecentsecretPlugin: Plugin {
         return context.evaluatedPolicyDomainState
     }
 
-    /// Record the current fingerprint beside the secret, so that a later
+    /// The device's current enrollment: its fingerprint, paired with the major
+    /// OS version that fingerprint was read on.
+    ///
+    /// The version is recorded because Apple warns that the fingerprint "can
+    /// change exceptionally between major OS versions even if the state of
+    /// biometry has not changed", so only fingerprints read on the same major
+    /// can be compared.
+    private func currentBiometricEnrollment() -> BiometricEnrollment? {
+        guard let domainState = currentBiometricDomainState() else { return nil }
+        return BiometricEnrollment.current(domainState: domainState)
+    }
+
+    /// Record the current enrollment beside the secret, so that a later
     /// failure to retrieve it can be told apart from a changed enrollment.
     ///
     /// The item deliberately carries no access control: it must be readable
@@ -188,21 +200,24 @@ class DecentsecretPlugin: Plugin {
     /// is wanted. It is not in UserDefaults either, whose lifetime and
     /// backup/restore semantics differ from those of the keychain item it
     /// describes, so a restore could resurrect a stale fingerprint.
-    private func storeBiometricDomainState() {
-        guard let domainState = currentBiometricDomainState() else { return }
+    private func storeBiometricEnrollment() {
+        guard let enrollment = currentBiometricEnrollment() else { return }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: kServiceName,
             kSecAttrAccount as String: kDomainStateAccountName,
-            kSecValueData as String: domainState,
+            kSecValueData as String: enrollment.encoded(),
             kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
         ]
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    /// The fingerprint recorded when the secret was stored, if there is one.
-    private func storedBiometricDomainState() -> Data? {
+    /// The enrollment record stored beside the secret, if there is one, in the
+    /// form it was written in. Earlier builds wrote the bare fingerprint, with
+    /// no OS version, which `RetrievalFailure.classify` treats as
+    /// inconclusive.
+    private func storedBiometricEnrollment() -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: kServiceName,
