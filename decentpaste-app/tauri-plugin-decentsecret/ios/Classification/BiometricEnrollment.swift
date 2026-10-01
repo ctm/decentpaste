@@ -25,21 +25,35 @@ public struct BiometricEnrollment: Equatable {
     /// The major OS version the fingerprint was read on, e.g. 18 for iOS 18.2.
     public let osMajorVersion: Int
 
-    /// The `evaluatedPolicyDomainState` fingerprint itself.
+    /// The `evaluatedPolicyDomainState` fingerprint itself, never empty.
     public let domainState: Data
 
-    public init(osMajorVersion: Int, domainState: Data) {
+    /// Fails on an empty fingerprint, which is no fingerprint at all: nothing
+    /// can be concluded by comparing it, so there is no way to build one.
+    ///
+    /// The invariant lives here, rather than at either comparison site,
+    /// because an empty fingerprint is useless on *both* sides. An empty
+    /// stored record says nothing about the enrollment the secret was stored
+    /// under, and an empty current one measured against a real stored record
+    /// compares unequal, announcing a change that never happened -- the false
+    /// `BIOMETRIC_CHANGED` that would have the caller write over a vault it
+    /// never read. `LAContext` documents neither that
+    /// `evaluatedPolicyDomainState` can be non-nil and empty nor that it
+    /// cannot, so neither side may assume it away.
+    public init?(osMajorVersion: Int, domainState: Data) {
+        guard !domainState.isEmpty else { return nil }
+
         self.osMajorVersion = osMajorVersion
         self.domainState = domainState
     }
 
     /// The enrollment as it stands on this device now, given the fingerprint
-    /// just read from an `LAContext`.
+    /// just read from an `LAContext`, or `nil` if that fingerprint is empty.
     ///
     /// This is the one place the running OS version is read, so that
     /// everything downstream of it is a pure function of its arguments and can
     /// be tested on the host.
-    public static func current(domainState: Data) -> BiometricEnrollment {
+    public static func current(domainState: Data) -> BiometricEnrollment? {
         BiometricEnrollment(
             osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
             domainState: domainState)
@@ -84,12 +98,11 @@ public struct BiometricEnrollment: Equatable {
             let osMajorVersion = Int(String(decoding: digits, as: UTF8.self))
         else { return nil }
 
-        // An empty fingerprint is no fingerprint: nothing can be concluded by
-        // comparing it, so it must not decode either.
-        let domainState = Data(versioned[versioned.index(after: separatorIndex)...])
-        guard !domainState.isEmpty else { return nil }
-
-        self.osMajorVersion = osMajorVersion
-        self.domainState = domainState
+        // A record carrying an empty fingerprint fails the initializer's
+        // invariant, so it does not decode, which is the inconclusive and
+        // therefore safe direction.
+        self.init(
+            osMajorVersion: osMajorVersion,
+            domainState: Data(versioned[versioned.index(after: separatorIndex)...]))
     }
 }

@@ -193,6 +193,10 @@ class DecentsecretPlugin: Plugin {
     /// change exceptionally between major OS versions even if the state of
     /// biometry has not changed", so only fingerprints read on the same major
     /// can be compared.
+    ///
+    /// Nil too when the fingerprint read is empty, which is no fingerprint:
+    /// `BiometricEnrollment` refuses to hold one, so that an empty current
+    /// fingerprint cannot be compared against a real stored one.
     private func currentBiometricEnrollment() -> BiometricEnrollment? {
         guard let domainState = currentBiometricDomainState() else { return nil }
         return BiometricEnrollment.current(domainState: domainState)

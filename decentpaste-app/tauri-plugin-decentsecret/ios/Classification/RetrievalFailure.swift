@@ -37,7 +37,8 @@ public enum RetrievalFailure {
     /// - A stored record that does not decode: the bare fingerprint earlier
     ///   builds wrote, or a format from a later one.
     /// - No current enrollment. `evaluatedPolicyDomainState` is nil whenever
-    ///   biometry cannot be evaluated at all.
+    ///   biometry cannot be evaluated at all, and an empty fingerprint builds
+    ///   no `BiometricEnrollment`.
     /// - A stored major OS version that is not the current one. Apple warns
     ///   that the fingerprint "can change exceptionally between major OS
     ///   versions even if the state of biometry has not changed", so across
