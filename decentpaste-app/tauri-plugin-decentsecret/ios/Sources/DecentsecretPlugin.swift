@@ -15,6 +15,9 @@ class StoreSecretArgs: Decodable {
 
 private let kServiceName = "com.decentpaste.vault"
 private let kAccountName = "vault-key"
+/// Sibling of `kAccountName` under the same service, holding the biometric
+/// enrollment fingerprint that the secret was stored under.
+private let kDomainStateAccountName = "vault-key-domain-state"
 
 // MARK: - Plugin Implementation
 
@@ -99,6 +102,10 @@ class DecentsecretPlugin: Plugin {
             let status = SecItemAdd(query as CFDictionary, nil)
 
             if status == errSecSuccess {
+                // Only once the secret is really there: a fingerprint without
+                // a secret would make the next retrieval's errSecItemNotFound
+                // look like a changed enrollment.
+                storeBiometricDomainState()
                 invoke.resolve([:])
             } else {
                 let errorMsg = securityErrorMessage(status)
@@ -140,7 +147,11 @@ class DecentsecretPlugin: Plugin {
             }
 
         default:
-            invoke.reject(RetrievalFailure.classify(status: status))
+            invoke.reject(RetrievalFailure.classify(
+                status: status,
+                storedDomainState: storedBiometricDomainState(),
+                currentDomainState: currentBiometricDomainState()
+            ))
         }
     }
 
@@ -151,15 +162,77 @@ class DecentsecretPlugin: Plugin {
         invoke.resolve([:])
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Biometric Enrollment Fingerprint
 
-    private func deleteFromKeychain() {
+    /// The device's current biometric enrollment fingerprint.
+    ///
+    /// `evaluatedPolicyDomainState` is only populated once the policy has been
+    /// found evaluable, and is nil otherwise.
+    private func currentBiometricDomainState() -> Data? {
+        let context = LAContext()
+        var error: NSError?
+
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return nil
+        }
+        return context.evaluatedPolicyDomainState
+    }
+
+    /// Record the current fingerprint beside the secret, so that a later
+    /// failure to retrieve it can be told apart from a changed enrollment.
+    ///
+    /// The item deliberately carries no access control: it must be readable
+    /// with no prompt, right after an authentication that just failed, and it
+    /// must stay readable once the secret itself has been invalidated. That is
+    /// why the fingerprint is a sibling item and not an attribute on the
+    /// secret -- an attribute cannot desynchronize, but reading it needs the
+    /// very authentication that failed, so it is unavailable exactly when it
+    /// is wanted. It is not in UserDefaults either, whose lifetime and
+    /// backup/restore semantics differ from those of the keychain item it
+    /// describes, so a restore could resurrect a stale fingerprint.
+    private func storeBiometricDomainState() {
+        guard let domainState = currentBiometricDomainState() else { return }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: kServiceName,
-            kSecAttrAccount as String: kAccountName
+            kSecAttrAccount as String: kDomainStateAccountName,
+            kSecValueData as String: domainState,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
         ]
-        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    /// The fingerprint recorded when the secret was stored, if there is one.
+    private func storedBiometricDomainState() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: kServiceName,
+            kSecAttrAccount as String: kDomainStateAccountName,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+            return nil
+        }
+        return result as? Data
+    }
+
+    // MARK: - Private Helpers
+
+    /// Delete the secret and its fingerprint together, so that the two have
+    /// exactly the same lifetime.
+    private func deleteFromKeychain() {
+        for account in [kAccountName, kDomainStateAccountName] {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: kServiceName,
+                kSecAttrAccount as String: account
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
     }
 }
 

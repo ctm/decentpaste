@@ -16,7 +16,37 @@ import Security
 public enum RetrievalFailure {
 
     /// Classify a non-success `OSStatus` from `SecItemCopyMatching`.
-    public static func classify(status: OSStatus) -> String {
+    ///
+    /// `storedDomainState` is the biometric enrollment fingerprint recorded
+    /// when the secret was stored and `currentDomainState` is the device's
+    /// fingerprint now; both are `LAContext.evaluatedPolicyDomainState`
+    /// values.
+    ///
+    /// Two fingerprints that are present and differ mean the enrollment
+    /// changed, which invalidated the item, because it is stored with
+    /// `[.biometryCurrentSet]`. That comparison is made ahead of the status
+    /// deliberately: iOS reports the invalidation with no distinguishable
+    /// status, so no status -- `errSecItemNotFound` included -- is evidence
+    /// against a changed enrollment.
+    ///
+    /// A fingerprint absent on either side, however, is not evidence *of* a
+    /// change, and must never yield `BIOMETRIC_CHANGED`. Installs made before
+    /// the fingerprint was recorded have a secret and no stored value, and
+    /// `evaluatedPolicyDomainState` is nil whenever biometry cannot be
+    /// evaluated at all. Claiming a reset in those cases would tell the caller
+    /// to write over a vault it had never read.
+    public static func classify(
+        status: OSStatus,
+        storedDomainState: Data?,
+        currentDomainState: Data?
+    ) -> String {
+        if let stored = storedDomainState, let current = currentDomainState, stored != current {
+            return "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change"
+        }
+        return statusFailure(status)
+    }
+
+    private static func statusFailure(_ status: OSStatus) -> String {
         switch status {
         case errSecItemNotFound:
             return "NOT_FOUND: No secret stored"
@@ -27,17 +57,8 @@ public enum RetrievalFailure {
         case errSecAuthFailed:
             return "AUTH_FAILED: Authentication failed"
 
-        case -25293: // errSecInvalidKeychain - often indicates biometric change
-            return "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change"
-
         default:
-            // Check if it's a biometric invalidation error
-            let errorMsg = securityErrorMessage(status)
-            if errorMsg.contains("invalidat") || errorMsg.contains("LAError") {
-                return "BIOMETRIC_CHANGED: \(errorMsg)"
-            } else {
-                return "Failed to retrieve secret: \(errorMsg)"
-            }
+            return "Failed to retrieve secret: \(securityErrorMessage(status))"
         }
     }
 }
