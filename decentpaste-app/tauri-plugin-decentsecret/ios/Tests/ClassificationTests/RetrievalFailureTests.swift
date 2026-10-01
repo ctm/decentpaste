@@ -204,7 +204,8 @@ final class RetrievalFailureTests: XCTestCase {
     /// whatever the status says. The comparison comes ahead of the status
     /// deliberately, because iOS reports the invalidation with no
     /// distinguishable status -- `errSecItemNotFound` included, which is the
-    /// status an invalidated item is most likely to come back as.
+    /// status a device measurement shows an invalidated item comes back as,
+    /// and which the test below pins on its own.
     func testDifferingSameMajorFingerprintsReportAChange() throws {
         let stored = try enrollment(18, fingerprint).encoded()
         let current = try enrollment(18, otherFingerprint)
@@ -217,6 +218,28 @@ final class RetrievalFailureTests: XCTestCase {
                 "\(status): \(message)")
             XCTAssertTrue(message.hasSuffix(" (OSStatus \(status))"), "\(status): \(message)")
         }
+    }
+
+    /// The measured field case, pinned whole: `errSecItemNotFound` beside a
+    /// differing same-major fingerprint.
+    ///
+    /// Measured on an iPhone -- secret stored, Face ID auto-login working, a
+    /// Face ID alternative appearance added, the app relaunched -- the
+    /// retrieval came back `errSecItemNotFound` rather than a refused
+    /// authentication, because iOS deletes an enrollment-invalidated item
+    /// instead of failing authentication on it. Of the statuses the sweep
+    /// above passes, this is the one a real enrollment change arrives on, so
+    /// a regression that let the status win here would answer a credential
+    /// iOS had already wiped with `NOT_FOUND`, and the embedding app would
+    /// set up a new vault over one it never read.
+    func testTheMeasuredFieldCaseReportsAChange() throws {
+        let stored = try enrollment(18, fingerprint).encoded()
+        let current = try enrollment(18, otherFingerprint)
+
+        XCTAssertEqual(
+            classify(errSecItemNotFound, stored: stored, current: current),
+            "BIOMETRIC_CHANGED: Key invalidated due to biometric enrollment change"
+                + " (OSStatus -25300)")
     }
 
     /// Two present, same-major, equal fingerprints: the enrollment is the one
