@@ -31,17 +31,6 @@ final class KeychainMutationTests: XCTestCase {
         OSStatus(-1),
     ]
 
-    /// The codes `map_plugin_error` matches on, in the order it tries them.
-    private let recognizedCodes = [
-        "NOT_AVAILABLE",
-        "AUTH_FAILED",
-        "BIOMETRIC_CHANGED",
-        "NO_BIOMETRICS",
-        "NOT_FOUND",
-        "ACCESS_DENIED",
-        "USER_CANCELLED",
-    ]
-
     /// Both mutations, so that the properties below are stated of the pair
     /// rather than of whichever one was written first.
     private let mutations: [(String, (OSStatus) -> String)] = [

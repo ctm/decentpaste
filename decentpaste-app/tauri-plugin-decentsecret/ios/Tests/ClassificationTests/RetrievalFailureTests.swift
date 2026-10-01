@@ -50,6 +50,36 @@ final class RetrievalFailureTests: XCTestCase {
         try XCTUnwrap(BiometricEnrollment(osMajorVersion: major, domainState: domainState))
     }
 
+    /// Every shape the enrollment pair comes in, with the one shape that is
+    /// evidence of a change marked as such.
+    ///
+    /// On this side the message is a function of the pair as well as the
+    /// status, so a property stated of one pair says nothing about the rest.
+    /// The properties below are swept over all of them.
+    private func enrollmentRows() throws -> [(String, Data?, BiometricEnrollment?, Bool)] {
+        [
+            ("no fingerprints at all", nil, nil, false),
+            ("nothing stored", nil, try enrollment(18, fingerprint), false),
+            ("no current enrollment", try enrollment(18, fingerprint).encoded(), nil, false),
+            (
+                "equal fingerprints", try enrollment(18, fingerprint).encoded(),
+                try enrollment(18, fingerprint), false
+            ),
+            (
+                "the bare fingerprint older builds wrote", fingerprint,
+                try enrollment(18, otherFingerprint), false
+            ),
+            (
+                "fingerprints read on different majors", try enrollment(19, fingerprint).encoded(),
+                try enrollment(18, otherFingerprint), false
+            ),
+            (
+                "differing same-major fingerprints", try enrollment(18, fingerprint).encoded(),
+                try enrollment(18, otherFingerprint), true
+            ),
+        ]
+    }
+
     // MARK: - Status Arms
 
     /// Three of the named arms, whole: `map_plugin_error` matches on the prefix,
@@ -258,5 +288,78 @@ final class RetrievalFailureTests: XCTestCase {
         XCTAssertEqual(
             classify(errSecAuthFailed, stored: stored, current: current),
             "AUTH_FAILED: Authentication failed (OSStatus -25293)")
+    }
+
+    // MARK: - The Properties Every Message Keeps
+
+    /// The number is appended, never substituted, so every report carries the
+    /// raw status whichever arm it took -- the enrollment arm included, which
+    /// is the one arm that names a cause the status does not.
+    func testEveryRetrievalFailureCarriesItsNumericStatus() throws {
+        for (row, stored, current, _) in try enrollmentRows() {
+            for status in keychainStatuses {
+                let message = classify(status, stored: stored, current: current)
+                XCTAssertTrue(
+                    message.hasSuffix(" (OSStatus \(status))"), "\(row), \(status): \(message)")
+            }
+        }
+    }
+
+    /// At most one recognized code per message, and in first place.
+    ///
+    /// `map_plugin_error` matches with `contains`, in a fixed order, so a
+    /// second code anywhere in a message -- including one that wandered in
+    /// from a system description, or one arm quoting another -- would be read
+    /// instead of the one the retrieval meant. One code, first, is what makes
+    /// that order irrelevant.
+    func testEachRetrievalMessageCarriesAtMostOneRecognizedCodeAndCarriesItFirst() throws {
+        for (row, stored, current, _) in try enrollmentRows() {
+            for status in keychainStatuses {
+                let message = classify(status, stored: stored, current: current)
+                let carried = recognizedCodes.filter { message.contains($0) }
+
+                XCTAssertLessThanOrEqual(carried.count, 1, "\(row), \(status): \(message)")
+                if let code = carried.first {
+                    XCTAssertTrue(message.hasPrefix("\(code): "), "\(row), \(status): \(message)")
+                }
+            }
+        }
+    }
+
+    /// `errSecItemNotFound` and nothing else reports a missing secret.
+    ///
+    /// `NOT_FOUND` tells the embedding app the vault holds nothing readable,
+    /// and the app then sets up a new one over a vault it never read, so an
+    /// unreachable keychain, a refused authentication and a status this code
+    /// does not name must all keep clear of it. That is why the arm takes one
+    /// status, and why a new arm may not reach for the nearest code.
+    func testOnlyItemNotFoundReportsAMissingSecret() throws {
+        XCTAssertTrue(classify(errSecItemNotFound).hasPrefix("NOT_FOUND: "))
+
+        for (row, stored, current, _) in try enrollmentRows() {
+            for status in keychainStatuses where status != errSecItemNotFound {
+                let message = classify(status, stored: stored, current: current)
+                XCTAssertFalse(message.contains("NOT_FOUND"), "\(row), \(status): \(message)")
+            }
+        }
+    }
+
+    /// The enrollment pair decides whether a change is reported, and the
+    /// status never does: across every status, each row answers the same way.
+    ///
+    /// The rows above pin the two cases that matter one at a time; this states
+    /// the whole grid at once, which is the form the mutation side's "no
+    /// failure reports a change" takes on a side that sometimes may. A status
+    /// admitted as evidence either way -- an `errSecItemNotFound` taken for an
+    /// invalidation, or taken as proof against one -- fails here.
+    func testOnlyTheChangedEnrollmentRowReportsAChange() throws {
+        for (row, stored, current, isChange) in try enrollmentRows() {
+            for status in keychainStatuses {
+                let message = classify(status, stored: stored, current: current)
+                XCTAssertEqual(
+                    message.contains("BIOMETRIC_CHANGED"), isChange,
+                    "\(row), \(status): \(message)")
+            }
+        }
     }
 }
