@@ -111,9 +111,7 @@ class DecentsecretPlugin: Plugin {
                 storeBiometricEnrollment()
                 invoke.resolve([:])
             } else {
-                let errorMsg = securityErrorMessage(status)
-                invoke.reject(
-                    failureMessage("Failed to store secret: \(errorMsg)", status: status))
+                invoke.reject(KeychainMutation.storeFailure(status: status))
             }
 
         } catch {
