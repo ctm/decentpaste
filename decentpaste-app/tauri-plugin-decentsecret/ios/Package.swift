@@ -32,6 +32,12 @@ let package = Package(
         // Dependency-free so that it can be unit tested without Tauri or a device.
         .target(
             name: "DecentsecretClassification",
-            path: "Classification")
+            path: "Classification"),
+        // Depends on the classification and nothing else: the tests must not
+        // need Tauri, UIKit or a device to run.
+        .testTarget(
+            name: "DecentsecretClassificationTests",
+            dependencies: [.byName(name: "DecentsecretClassification")],
+            path: "Tests/ClassificationTests")
     ]
 )
