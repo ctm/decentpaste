@@ -138,6 +138,16 @@ class DecentsecretPlugin: Plugin {
         switch status {
         case errSecSuccess:
             if let data = result as? Data {
+                // The secret was just read under the current enrollment, so
+                // that enrollment is exactly the one a later change has to be
+                // measured against. Recording it here is what covers the
+                // installs that already hold a secret and have no fingerprint
+                // beside it, and what re-anchors a record the OS changed
+                // under us by its own major upgrade. Without it, such an
+                // install stays inconclusive until the user happens to store
+                // a new secret, which for a vault key may be never.
+                storeBiometricEnrollment()
+
                 let secretArray = data.map { Int($0) }
                 invoke.resolve(["secret": secretArray])
             } else {
@@ -190,6 +200,8 @@ class DecentsecretPlugin: Plugin {
 
     /// Record the current enrollment beside the secret, so that a later
     /// failure to retrieve it can be told apart from a changed enrollment.
+    /// Called when a secret is stored, and again whenever one is read, which
+    /// is a no-op once the record is the current enrollment's.
     ///
     /// The item deliberately carries no access control: it must be readable
     /// with no prompt, right after an authentication that just failed, and it
@@ -212,6 +224,11 @@ class DecentsecretPlugin: Plugin {
     private func storeBiometricEnrollment() {
         guard let enrollment = currentBiometricEnrollment() else { return }
         let encoded = enrollment.encoded()
+
+        // Every successful retrieval calls this, so the usual case is that
+        // the record is already the current enrollment's; reading it back
+        // takes no authentication and saves a pointless write.
+        guard storedBiometricEnrollment() != encoded else { return }
 
         let item: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
