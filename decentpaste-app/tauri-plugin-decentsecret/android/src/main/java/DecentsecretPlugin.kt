@@ -21,6 +21,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -44,6 +45,13 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
 
     // Thread-safe map for pending biometric operations
     private val pendingInvokes = ConcurrentHashMap<String, Invoke>()
+
+    // Keys the entries above. A counter rather than a clock, because two
+    // invocations inside one millisecond would share a timestamp: the second
+    // insert would drop the first entry, leaving that command unanswered,
+    // and the first prompt's callback would then remove and answer the
+    // second caller's Invoke with the first operation's data.
+    private val nextInvokeId = AtomicLong()
 
     @Command
     fun checkAvailability(invoke: Invoke) {
@@ -259,7 +267,7 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
         // before the prompt -- an invalidated key above all -- leaves nothing
         // in it: this is the only place that puts an entry there, and every
         // path out of here removes it.
-        val invokeId = System.currentTimeMillis().toString()
+        val invokeId = nextInvokeId.incrementAndGet().toString()
         pendingInvokes[invokeId] = pendingInvoke
 
         val fragmentActivity = activity as? FragmentActivity
