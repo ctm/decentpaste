@@ -109,16 +109,40 @@ final class RetrievalFailureTests: XCTestCase {
             "NOT_AVAILABLE: This build has no keychain entitlement (OSStatus -34018)")
     }
 
-    /// A retrieval and a mutation answer an unusable keychain identically.
+    /// A retrieval and a mutation agree, status by status, on which statuses
+    /// mean the keychain itself is unusable, and answer those identically.
+    ///
     /// Naming those statuses on the mutation side only is what left a
-    /// retrieval reporting them as an unprefixed plugin failure, and holding
-    /// the messages equal is what keeps the two sides from parting again.
-    func testBothSidesNameTheSameUnavailableStatuses() {
-        for status in [errSecNotAvailable, errSecMissingEntitlement] {
-            XCTAssertEqual(
-                classify(status), KeychainMutation.storeFailure(status: status), "\(status)")
-            XCTAssertEqual(
-                classify(status), KeychainMutation.deleteFailure(status: status), "\(status)")
+    /// retrieval reporting them as an unprefixed plugin failure, so what has
+    /// to be held is the *set*: an arm added to or dropped from one side alone
+    /// is the defect, and pinning the messages of the statuses both sides
+    /// already name cannot see it. Sweep every status either side might be
+    /// handed and compare the two answers for a `NOT_AVAILABLE` prefix, which
+    /// fails on a one-sided arm for any status in the list; where both say
+    /// `NOT_AVAILABLE`, hold the whole message equal, which fails on wording
+    /// that drifts apart.
+    ///
+    /// An unusable keychain is a property of the keychain rather than of the
+    /// operation attempted on it, which is why there is a set to agree about.
+    /// Nothing else is shared: `NOT_FOUND` is the retrieval's alone, and so
+    /// is the enrollment comparison.
+    func testBothSidesAgreeOnWhichStatusesLeaveTheKeychainUnavailable() {
+        let isUnavailable = { (message: String) in message.hasPrefix("NOT_AVAILABLE: ") }
+
+        for status in keychainStatuses {
+            let retrieval = classify(status)
+
+            for (mutation, message) in [
+                ("store", KeychainMutation.storeFailure(status: status)),
+                ("delete", KeychainMutation.deleteFailure(status: status)),
+            ] {
+                XCTAssertEqual(
+                    isUnavailable(retrieval), isUnavailable(message),
+                    "\(mutation) \(status): \(retrieval) / \(message)")
+                if isUnavailable(retrieval) && isUnavailable(message) {
+                    XCTAssertEqual(retrieval, message, "\(mutation) \(status)")
+                }
+            }
         }
     }
 
