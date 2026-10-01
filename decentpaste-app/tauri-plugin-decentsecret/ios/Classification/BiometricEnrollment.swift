@@ -84,8 +84,16 @@ public struct BiometricEnrollment: Equatable {
     /// one stored the bare fingerprint, with no version recorded, and those
     /// bytes do not decode. The caller must treat every `nil` as inconclusive
     /// -- an unknown OS version is exactly as uncomparable as a missing
-    /// fingerprint -- and the same goes for a future format, a truncated
-    /// record, or a major version too large for `Int`.
+    /// fingerprint -- and the same goes for a future format, a record cut
+    /// short inside this header, or a major version too large for `Int`.
+    ///
+    /// A cut landing past the header is a different matter: the format
+    /// carries neither a length nor a checksum, so a record holding only the
+    /// first bytes of its fingerprint is well formed, decodes, and compares
+    /// unequal to the enrollment it was written from -- conclusive, and
+    /// wrong. Nothing readable here can tell the two apart. What rules it out
+    /// is that the keychain writes an item's data atomically, so a half
+    /// written record is not a state the item can be left in.
     public init?(encoded: Data) {
         let bytes = Array(encoded)
         guard bytes.starts(with: Self.magic) else { return nil }
