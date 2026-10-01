@@ -65,13 +65,16 @@ public enum RetrievalFailure {
 
     /// The failure the status alone names.
     ///
-    /// The two unavailable-keychain arms are `KeychainMutation`'s, word for
-    /// word: an unusable keychain is a property of the keychain rather than of
-    /// the operation attempted on it, so both sides name the same statuses and
-    /// a test holds the messages equal. `NOT_AVAILABLE` is what either one
-    /// means to the embedding app -- neither status says anything about this
-    /// device's secret, and `NOT_FOUND` would have the app overwrite a vault
-    /// it never read.
+    /// The two arms that name the environment rather than the operation are
+    /// `KeychainMutation`'s, word for word: neither an unusable keychain nor a
+    /// build forbidden from using one is a property of the operation attempted,
+    /// so both sides name the same statuses and a test holds the messages
+    /// equal. They carry different codes because the embedding app can act on
+    /// the difference: a device with no keychain to offer is one to degrade
+    /// quietly on, while a build without the entitlement is a provisioning
+    /// defect whoever installed it needs told about. Neither status says
+    /// anything about this device's secret, so neither is `NOT_FOUND`, which
+    /// would have the app overwrite a vault it never read.
     private static func statusFailure(_ status: OSStatus) -> String {
         switch status {
         case errSecItemNotFound:
@@ -88,7 +91,7 @@ public enum RetrievalFailure {
 
         case errSecMissingEntitlement:
             return failureMessage(
-                "NOT_AVAILABLE: This build has no keychain entitlement", status: status)
+                "MISCONFIGURED: This build has no keychain entitlement", status: status)
 
         default:
             return failureMessage(

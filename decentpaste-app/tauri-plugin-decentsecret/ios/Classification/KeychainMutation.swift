@@ -76,7 +76,7 @@ public enum KeychainMutation {
 
         case errSecMissingEntitlement:
             return failureMessage(
-                "NOT_AVAILABLE: This build has no keychain entitlement", status: status)
+                "MISCONFIGURED: This build has no keychain entitlement", status: status)
 
         default:
             return failureMessage(

@@ -13,6 +13,13 @@ pub enum Error {
     #[error("Secure storage not available: {0}")]
     NotAvailable(String),
 
+    /// This application is not configured to use the secure storage the
+    /// platform does offer: on iOS, a build without the keychain entitlement.
+    /// A defect in the build rather than a property of the device, so an
+    /// embedding app that degrades quietly on `NotAvailable` reports this one.
+    #[error("Secure storage misconfigured: {0}")]
+    Misconfigured(String),
+
     /// User failed to authenticate (wrong biometric, cancelled, etc.)
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),

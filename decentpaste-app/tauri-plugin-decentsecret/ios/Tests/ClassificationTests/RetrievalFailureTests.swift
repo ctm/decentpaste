@@ -96,17 +96,18 @@ final class RetrievalFailureTests: XCTestCase {
             "AUTH_FAILED: Authentication failed (OSStatus -25293)")
     }
 
-    /// The two statuses that mean the keychain itself is unusable, whole.
-    /// Both are `NOT_AVAILABLE` and keep their own wording, because "no
-    /// keychain at all" and "this build may not use the keychain" are the same
-    /// thing to the embedding app and nothing alike to whoever has to fix it.
-    func testTheUnavailableKeychainArms() {
+    /// The two statuses that mean no retrieval can read this keychain, whole.
+    /// They carry different codes because the embedding app acts on the
+    /// difference: "no keychain at all" is a device to degrade quietly on, and
+    /// "this build may not use the keychain" is a defect whoever installed the
+    /// build needs told about.
+    func testTheArmsNoRetrievalCanGetPast() {
         XCTAssertEqual(
             classify(errSecNotAvailable),
             "NOT_AVAILABLE: No keychain is available (OSStatus -25291)")
         XCTAssertEqual(
             classify(errSecMissingEntitlement),
-            "NOT_AVAILABLE: This build has no keychain entitlement (OSStatus -34018)")
+            "MISCONFIGURED: This build has no keychain entitlement (OSStatus -34018)")
     }
 
     /// A retrieval and a mutation agree, status by status, on which statuses

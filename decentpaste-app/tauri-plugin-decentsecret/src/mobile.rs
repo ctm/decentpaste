@@ -77,13 +77,20 @@ impl<R: Runtime> Decentsecret<R> {
 
     /// Map native plugin errors to our error type.
     ///
-    /// Native code returns structured errors that we parse here.
+    /// Native code returns structured errors that we parse here. The codes are
+    /// tried in sequence with `contains`, so a code added here must neither
+    /// contain nor be contained by another, and the native side must put at
+    /// most one of them in a message, first (`recognizedCodes` and the
+    /// properties stated of it,
+    /// `ios/Tests/ClassificationTests/ClassificationFixtures.swift`).
     fn map_plugin_error(&self, err: tauri::plugin::mobile::PluginInvokeError) -> Error {
         let msg = err.to_string();
 
         // Parse error codes from native plugins
         if msg.contains("NOT_AVAILABLE") {
             Error::NotAvailable(msg)
+        } else if msg.contains("MISCONFIGURED") {
+            Error::Misconfigured(msg)
         } else if msg.contains("AUTH_FAILED") {
             Error::AuthenticationFailed(msg)
         } else if msg.contains("BIOMETRIC_CHANGED") {

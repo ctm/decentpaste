@@ -40,10 +40,10 @@ final class KeychainMutationTests: XCTestCase {
 
     // MARK: - Status Arms
 
-    /// The named arms, whole. Two statuses share `NOT_AVAILABLE` and keep
-    /// their own wording, because "no keychain at all" and "this build may not
-    /// use the keychain" are the same thing to the embedding app and nothing
-    /// alike to whoever has to fix it.
+    /// The named arms, whole. Two statuses say the mutation never reached a
+    /// keychain it could use, and they carry different codes: "no keychain at
+    /// all" is a device to degrade quietly on, and "this build may not use the
+    /// keychain" is a defect whoever installed the build needs told about.
     func testTheNamedStoreArms() {
         XCTAssertEqual(
             KeychainMutation.storeFailure(status: errSecAuthFailed),
@@ -56,7 +56,7 @@ final class KeychainMutationTests: XCTestCase {
             "NOT_AVAILABLE: No keychain is available (OSStatus -25291)")
         XCTAssertEqual(
             KeychainMutation.storeFailure(status: errSecMissingEntitlement),
-            "NOT_AVAILABLE: This build has no keychain entitlement (OSStatus -34018)")
+            "MISCONFIGURED: This build has no keychain entitlement (OSStatus -34018)")
     }
 
     /// The unprefixed arm quotes the system's description of the status, which

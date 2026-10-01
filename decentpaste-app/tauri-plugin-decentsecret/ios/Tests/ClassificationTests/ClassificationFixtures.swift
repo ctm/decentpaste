@@ -13,6 +13,7 @@ import Security
 /// the Rust side learned last.
 let recognizedCodes = [
     "NOT_AVAILABLE",
+    "MISCONFIGURED",
     "AUTH_FAILED",
     "BIOMETRIC_CHANGED",
     "NO_BIOMETRICS",
