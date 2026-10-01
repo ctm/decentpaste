@@ -24,12 +24,14 @@ final class RetrievalFailureTests: XCTestCase {
     private let fingerprint = Data([0x01, 0x02, 0x03])
     private let otherFingerprint = Data([0x01, 0x02, 0x04])
 
-    /// Every status worth passing: the three the classification names, two
+    /// Every status worth passing: the five the classification names, two
     /// that fall to the default arm, and one the system has no message for.
     private let statuses: [OSStatus] = [
         errSecItemNotFound,
         errSecUserCanceled,
         errSecAuthFailed,
+        errSecNotAvailable,
+        errSecMissingEntitlement,
         errSecInvalidKeychain,
         errSecInteractionNotAllowed,
         OSStatus(-1),
@@ -50,7 +52,7 @@ final class RetrievalFailureTests: XCTestCase {
 
     // MARK: - Status Arms
 
-    /// The three named arms, whole: `map_plugin_error` matches on the prefix,
+    /// Three of the named arms, whole: `map_plugin_error` matches on the prefix,
     /// so it stays first, and the number stays last.
     func testTheNamedStatusArms() {
         XCTAssertEqual(
@@ -62,6 +64,32 @@ final class RetrievalFailureTests: XCTestCase {
         XCTAssertEqual(
             classify(errSecAuthFailed),
             "AUTH_FAILED: Authentication failed (OSStatus -25293)")
+    }
+
+    /// The two statuses that mean the keychain itself is unusable, whole.
+    /// Both are `NOT_AVAILABLE` and keep their own wording, because "no
+    /// keychain at all" and "this build may not use the keychain" are the same
+    /// thing to the embedding app and nothing alike to whoever has to fix it.
+    func testTheUnavailableKeychainArms() {
+        XCTAssertEqual(
+            classify(errSecNotAvailable),
+            "NOT_AVAILABLE: No keychain is available (OSStatus -25291)")
+        XCTAssertEqual(
+            classify(errSecMissingEntitlement),
+            "NOT_AVAILABLE: This build has no keychain entitlement (OSStatus -34018)")
+    }
+
+    /// A retrieval and a mutation answer an unusable keychain identically.
+    /// Naming those statuses on the mutation side only is what left a
+    /// retrieval reporting them as an unprefixed plugin failure, and holding
+    /// the messages equal is what keeps the two sides from parting again.
+    func testBothSidesNameTheSameUnavailableStatuses() {
+        for status in [errSecNotAvailable, errSecMissingEntitlement] {
+            XCTAssertEqual(
+                classify(status), KeychainMutation.storeFailure(status: status), "\(status)")
+            XCTAssertEqual(
+                classify(status), KeychainMutation.deleteFailure(status: status), "\(status)")
+        }
     }
 
     /// The default arm quotes the system's description of the status, which is
