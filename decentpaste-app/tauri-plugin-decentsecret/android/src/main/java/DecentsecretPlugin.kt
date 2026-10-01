@@ -110,17 +110,13 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
                 return
             }
 
-            // Store invoke for callback
-            val invokeId = System.currentTimeMillis().toString()
-            pendingInvokes[invokeId] = invoke
-
             // Initialize cipher for encryption
             val cipher = getCipher()
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
 
             // Show biometric prompt
             showBiometricPrompt(
-                invokeId = invokeId,
+                pendingInvoke = invoke,
                 cipher = cipher,
                 operation = BiometricOperation.STORE,
                 secretBytes = secretBytes
@@ -154,10 +150,6 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
                 return
             }
 
-            // Store invoke for callback
-            val invokeId = System.currentTimeMillis().toString()
-            pendingInvokes[invokeId] = invoke
-
             // Initialize cipher for decryption
             val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
             val cipher = getCipher()
@@ -165,7 +157,7 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
 
             // Show biometric prompt
             showBiometricPrompt(
-                invokeId = invokeId,
+                pendingInvoke = invoke,
                 cipher = cipher,
                 operation = BiometricOperation.RETRIEVE,
                 encryptedData = Base64.decode(encryptedBase64, Base64.NO_WRAP)
@@ -257,12 +249,19 @@ class DecentsecretPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun showBiometricPrompt(
-        invokeId: String,
+        pendingInvoke: Invoke,
         cipher: Cipher,
         operation: BiometricOperation,
         secretBytes: ByteArray? = null,
         encryptedData: ByteArray? = null
     ) {
+        // The map holds the invoke from here on, so a command that fails
+        // before the prompt -- an invalidated key above all -- leaves nothing
+        // in it: this is the only place that puts an entry there, and every
+        // path out of here removes it.
+        val invokeId = System.currentTimeMillis().toString()
+        pendingInvokes[invokeId] = pendingInvoke
+
         val fragmentActivity = activity as? FragmentActivity
         if (fragmentActivity == null) {
             pendingInvokes.remove(invokeId)?.reject("NOT_AVAILABLE: Activity is not a FragmentActivity")
