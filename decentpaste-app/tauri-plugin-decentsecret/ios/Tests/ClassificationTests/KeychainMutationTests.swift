@@ -145,6 +145,22 @@ final class KeychainMutationTests: XCTestCase {
         }
     }
 
+    /// `errSecMissingEntitlement` and nothing else reports a misconfigured
+    /// build. The code says the build may not use the keychain, which is
+    /// somebody's to rebuild, so an arm reaching for it on a status that means
+    /// anything else -- a locked-out biometry, an item that would not be
+    /// replaced -- reports a defect that is not there.
+    func testOnlyAMissingEntitlementReportsAMisconfiguredBuild() {
+        for (mutation, classify) in mutations {
+            for status in failureStatuses {
+                XCTAssertEqual(
+                    classify(status).contains("MISCONFIGURED"),
+                    status == errSecMissingEntitlement,
+                    "\(mutation) \(status): \(classify(status))")
+            }
+        }
+    }
+
     // MARK: - What A Mutation Must Never Claim
 
     /// No mutation failure reports a changed enrollment. A store binds the new

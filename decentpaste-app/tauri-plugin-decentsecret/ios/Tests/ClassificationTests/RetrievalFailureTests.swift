@@ -112,23 +112,36 @@ final class RetrievalFailureTests: XCTestCase {
 
     /// A retrieval and a mutation agree, status by status, on which statuses
     /// mean the keychain itself is unusable, and answer those identically.
-    ///
-    /// Naming those statuses on the mutation side only is what left a
-    /// retrieval reporting them as an unprefixed plugin failure, so what has
-    /// to be held is the *set*: an arm added to or dropped from one side alone
-    /// is the defect, and pinning the messages of the statuses both sides
-    /// already name cannot see it. Sweep every status either side might be
-    /// handed and compare the two answers for a `NOT_AVAILABLE` prefix, which
-    /// fails on a one-sided arm for any status in the list; where both say
-    /// `NOT_AVAILABLE`, hold the whole message equal, which fails on wording
-    /// that drifts apart.
-    ///
-    /// An unusable keychain is a property of the keychain rather than of the
-    /// operation attempted on it, which is why there is a set to agree about.
-    /// Nothing else is shared: `NOT_FOUND` is the retrieval's alone, and so
-    /// is the enrollment comparison.
     func testBothSidesAgreeOnWhichStatusesLeaveTheKeychainUnavailable() {
-        let isUnavailable = { (message: String) in message.hasPrefix("NOT_AVAILABLE: ") }
+        assertBothSidesAgree(onPrefix: "NOT_AVAILABLE: ")
+    }
+
+    /// The same of the build's own defect. A missing entitlement belongs to
+    /// the build whichever operation ran into it, so a side answering it with
+    /// any other code -- `NOT_AVAILABLE`, as both sides did before the two
+    /// were told apart -- fails here.
+    func testBothSidesAgreeOnWhichStatusesMeanTheBuildIsMisconfigured() {
+        assertBothSidesAgree(onPrefix: "MISCONFIGURED: ")
+    }
+
+    /// The shared-set property, stated of one code prefix.
+    ///
+    /// Naming a status on the mutation side only is what left a retrieval
+    /// reporting it as an unprefixed plugin failure, so what has to be held is
+    /// the *set*: an arm added to or dropped from one side alone is the defect,
+    /// and pinning the messages of the statuses both sides already name cannot
+    /// see it. Sweep every status either side might be handed and compare the
+    /// two answers for the prefix, which fails on a one-sided arm for any
+    /// status in the list; where both carry it, hold the whole message equal,
+    /// which fails on wording that drifts apart.
+    ///
+    /// The two codes with a set to agree about are the two that name the
+    /// environment -- a keychain this device cannot offer, and a build
+    /// forbidden from using the one it has -- because neither is a property of
+    /// the operation attempted. Nothing else is shared: `NOT_FOUND` is the
+    /// retrieval's alone, and so is the enrollment comparison.
+    private func assertBothSidesAgree(onPrefix prefix: String) {
+        let carries = { (message: String) in message.hasPrefix(prefix) }
 
         for status in keychainStatuses {
             let retrieval = classify(status)
@@ -138,10 +151,10 @@ final class RetrievalFailureTests: XCTestCase {
                 ("delete", KeychainMutation.deleteFailure(status: status)),
             ] {
                 XCTAssertEqual(
-                    isUnavailable(retrieval), isUnavailable(message),
-                    "\(mutation) \(status): \(retrieval) / \(message)")
-                if isUnavailable(retrieval) && isUnavailable(message) {
-                    XCTAssertEqual(retrieval, message, "\(mutation) \(status)")
+                    carries(retrieval), carries(message),
+                    "\(prefix) \(mutation) \(status): \(retrieval) / \(message)")
+                if carries(retrieval) && carries(message) {
+                    XCTAssertEqual(retrieval, message, "\(prefix) \(mutation) \(status)")
                 }
             }
         }
@@ -365,6 +378,29 @@ final class RetrievalFailureTests: XCTestCase {
             for status in keychainStatuses where status != errSecItemNotFound {
                 let message = classify(status, stored: stored, current: current)
                 XCTAssertFalse(message.contains("NOT_FOUND"), "\(row), \(status): \(message)")
+            }
+        }
+    }
+
+    /// `errSecMissingEntitlement` and nothing else reports a misconfigured
+    /// build, and the enrollment comparison still outranks it.
+    ///
+    /// `MISCONFIGURED` is the one code whose remedy is somebody rebuilding the
+    /// app, so an arm reaching for it on another status reports a defect that
+    /// is not there and sends whoever reads it looking for a provisioning
+    /// mistake. The changed-enrollment row is the exception the grid carries:
+    /// that row answers every status with `BIOMETRIC_CHANGED`, this one
+    /// included, because an invalidation iOS reports under no status of its
+    /// own is what the caller can act on, and a build with no entitlement
+    /// could not have read the stored record to compare in the first place.
+    func testOnlyAMissingEntitlementReportsAMisconfiguredBuild() throws {
+        for (row, stored, current, isChange) in try enrollmentRows() {
+            for status in keychainStatuses {
+                let message = classify(status, stored: stored, current: current)
+                XCTAssertEqual(
+                    message.contains("MISCONFIGURED"),
+                    status == errSecMissingEntitlement && !isChange,
+                    "\(row), \(status): \(message)")
             }
         }
     }
