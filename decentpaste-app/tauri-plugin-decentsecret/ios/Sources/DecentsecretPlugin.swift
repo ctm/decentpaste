@@ -200,17 +200,34 @@ class DecentsecretPlugin: Plugin {
     /// is wanted. It is not in UserDefaults either, whose lifetime and
     /// backup/restore semantics differ from those of the keychain item it
     /// describes, so a restore could resurrect a stale fingerprint.
+    ///
+    /// The write overwrites whatever is there. `storeSecret` deletes the pair
+    /// before storing, but a delete that failed leaves the old record in
+    /// place, where a bare `SecItemAdd` reports `errSecDuplicateItem` and
+    /// leaves it: the next retrieval would then measure a brand new secret
+    /// against a previous enrollment and announce a change that never
+    /// happened. If the update fails as well, delete the record rather than
+    /// let it stand, since an absent record is merely inconclusive while a
+    /// stale one is a false `BIOMETRIC_CHANGED`.
     private func storeBiometricEnrollment() {
         guard let enrollment = currentBiometricEnrollment() else { return }
+        let encoded = enrollment.encoded()
 
-        let query: [String: Any] = [
+        let item: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: kServiceName,
-            kSecAttrAccount as String: kDomainStateAccountName,
-            kSecValueData as String: enrollment.encoded(),
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+            kSecAttrAccount as String: kDomainStateAccountName
         ]
-        SecItemAdd(query as CFDictionary, nil)
+        var addQuery = item
+        addQuery[kSecValueData as String] = encoded
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+
+        guard SecItemAdd(addQuery as CFDictionary, nil) == errSecDuplicateItem else { return }
+
+        let attributes: [String: Any] = [kSecValueData as String: encoded]
+        if SecItemUpdate(item as CFDictionary, attributes as CFDictionary) != errSecSuccess {
+            SecItemDelete(item as CFDictionary)
+        }
     }
 
     /// The enrollment record stored beside the secret, if there is one, in the
