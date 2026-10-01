@@ -15,8 +15,14 @@ class StoreSecretArgs: Decodable {
 
 private let kServiceName = "com.decentpaste.vault"
 private let kAccountName = "vault-key"
-/// Sibling of `kAccountName` under the same service, holding the biometric
-/// enrollment fingerprint that the secret was stored under.
+/// Sibling of `kAccountName` under the same service, holding the record of
+/// the biometric enrollment the secret was stored under: the fingerprint
+/// together with the major OS version it was read on, as
+/// `BiometricEnrollment.encoded()` writes it.
+///
+/// The account string still says "domain-state", from when the item held the
+/// bare fingerprint, and has to: renaming it would hide the items older
+/// builds wrote, which a successful read re-anchors in the current format.
 private let kDomainStateAccountName = "vault-key-domain-state"
 
 // MARK: - Plugin Implementation
